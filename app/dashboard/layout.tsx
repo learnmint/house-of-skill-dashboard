@@ -84,6 +84,11 @@ export default function DashboardLayout({
            <a href="/dashboard/teachers">Teachers</a>
           )}
 
+          {(profile.role === "admin" ||
+          profile.role === "sales_manager" ||
+          profile.role === "webinar_manager") && (
+          <a href="/dashboard/courses">Courses</a>
+          )}
 
           <a href="/dashboard/onboarding">Onboarding</a>
 
