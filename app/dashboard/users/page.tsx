@@ -18,6 +18,16 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newDepartment, setNewDepartment] = useState("");
+  const [newRole, setNewRole] = useState("bda");
+  const [newStatus, setNewStatus] = useState("active");
+  const [newPassword, setNewPassword] = useState("");
+
+
 
   useEffect(() => {
     loadUsers();
@@ -92,6 +102,57 @@ export default function UsersPage() {
     setEditingUser(null);
     await loadUsers();
   };
+  
+  const handleCreate = async () => {
+  setSaving(true);
+  setError("");
+
+  if (!newEmail || !newPassword) {
+    setError("Email and password are required");
+    setSaving(false);
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/admin/create-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: newEmail,
+        password: newPassword,
+        full_name: newName,
+        department: newDepartment,
+        role: newRole,
+        status: newStatus,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Failed to create user");
+      setSaving(false);
+      return;
+    }
+
+    // Reset form
+    setNewName("");
+    setNewEmail("");
+    setNewPassword("");
+    setNewDepartment("");
+    setNewRole("bda");
+    setNewStatus("active");
+    setShowCreate(false);
+    setSaving(false);
+    await loadUsers();
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message || "Network error");
+    setSaving(false);
+  }
+};
+
+
 
   return (
     <div>
@@ -104,10 +165,11 @@ export default function UsersPage() {
         <p>Loading...</p>
       ) : (
         <>
-          <div style={{ margin: "16px 0" }}>
-            <button onClick={loadUsers}>Refresh</button>
-            {/* Later: add "Create new user" button here */}
+          <div style={{ margin: "16px 0", display: "flex", gap: 8 }}>
+          <button onClick={loadUsers}>Refresh</button>
+          <button onClick={() => setShowCreate(true)}>Create new user</button>
           </div>
+
 
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -239,6 +301,121 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Create User popup */}
+{showCreate && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.4)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 30,
+    }}
+  >
+    <div style={{ background: "white", padding: 24, borderRadius: 8, width: 420 }}>
+      <h2>Create New User</h2>
+      <p style={{ fontSize: 12, marginBottom: 12 }}>
+      This will create a new login account and profile for the user with the selected role.
+      Share the email and temporary password with them.
+      </p>
+
+
+      <label>
+        Full Name
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+        />
+      </label>
+
+      <label>
+        Email
+        <input
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+          required
+        />
+      </label>
+
+      <label>
+     Temporary Password
+     <input
+     type="password"
+     value={newPassword}
+     onChange={(e) => setNewPassword(e.target.value)}
+     style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+     required
+    />
+    </label>
+
+
+      <label>
+        Department
+        <input
+          type="text"
+          value={newDepartment}
+          onChange={(e) => setNewDepartment(e.target.value)}
+          style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+        />
+      </label>
+
+      <label>
+        Role
+        <select
+          value={newRole}
+          onChange={(e) => setNewRole(e.target.value)}
+          style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+        >
+          <option value="admin">Admin</option>
+          <option value="sales_manager">Sales Manager</option>
+          <option value="team_leader">Team Leader</option>
+          <option value="bda">BDA</option>
+          <option value="webinar_manager">Webinar Manager</option>
+          <option value="webinar_associate">Webinar Associate</option>
+          <option value="onboarding">Onboarding Team</option>
+        </select>
+      </label>
+
+      <label>
+        Status
+        <select
+          value={newStatus}
+          onChange={(e) => setNewStatus(e.target.value)}
+          style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </label>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginTop: 12,
+        }}
+      >
+        <button onClick={() => setShowCreate(false)} disabled={saving}>
+          Cancel
+        </button>
+        <button onClick={handleCreate} disabled={saving}>
+          {saving ? "Creating..." : "Create"}
+        </button>
+      </div>
+    </div>
+  </div>
+ )}
+
     </div>
   );
 }
