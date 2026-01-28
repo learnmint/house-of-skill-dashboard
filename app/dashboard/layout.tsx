@@ -80,6 +80,11 @@ export default function DashboardLayout({
             <a href="/dashboard/payment-pages">Payment Pages</a>
           )}
 
+           {(profile.role === "admin" || profile.role === "webinar_manager") && (
+           <a href="/dashboard/teachers">Teachers</a>
+          )}
+
+
           <a href="/dashboard/onboarding">Onboarding</a>
 
           {(profile.role === "admin" ||
