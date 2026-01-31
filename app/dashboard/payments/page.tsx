@@ -173,10 +173,18 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
   useEffect(() => {
     loadLinks();
   }, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
-  useEffect(() => {
-  loadLinks();
-}, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
 
+  useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && selectedLinkForJourney) {
+      setSelectedLinkForJourney(null);
+      setJourneyEvents([]);
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, [selectedLinkForJourney]);
 
   const handleCreateLink = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -317,7 +325,8 @@ const { error: updateError } = await supabase
       "Gateway",
       "State",
       "Created By",
-      "Payment Link",
+      "Checkout Link",
+      "Gateway Link",
     ];
 
     const rows = links.map((link) => [
@@ -334,6 +343,7 @@ const { error: updateError } = await supabase
       link.gateway,
       link.state || "",
       link.creator_name || "",
+      link.checkout_link_url || "",
       link.gateway_link_url || "",
     ]);
 
@@ -1151,7 +1161,7 @@ const { error: updateError } = await supabase
                           ? "#fef3c7"
                           : "#e5e7eb",
                       color:
-                        link.status === "Paid"
+                        link.status === "paid"
                           ? "#065f46"
                           : link.status === "partial_paid"
                           ? "#92400e"
