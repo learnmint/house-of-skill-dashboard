@@ -63,9 +63,10 @@ export default function CheckoutPage() {
     if (error) throw error;
     
     console.log('✅ Fetched payment link data:', data);
+    console.log('💰 Status:', data.status);
     
-    // 👇 NEW: Check if already paid
-    if (data.status === 'paid') {
+    // 👇 Check if already paid (check for multiple possible "paid" statuses)
+    if (data.status === 'paid' || data.status === 'fully_paid') {
       console.log('✅ Payment already completed, redirecting to success page');
       
       // Fetch course details for success page
@@ -99,47 +100,46 @@ export default function CheckoutPage() {
     setCustomerPhone(data.customer_phone || '');
     setCustomerEmail(data.customer_email || '');
 
-      // Fetch course name 
-// Use course_name directly from payment_links
-if (data.course_name) {
-  setCourseName(data.course_name);
-} else {
-  setCourseName('Unknown Course');
-}
-
-// WhatsApp community link from courses
-if (data.course_id) {
-  const { data: courseData, error: courseError } = await supabase
-    .from('courses')
-    .select('name, whatsapp_community_link')
-    .eq('id', data.course_id)
-    .single();
-
-  if (courseError || !courseData) {
-    console.error('Error fetching course:', courseError);
-    setCourseName(data.course_name || 'Unknown Course');
-    setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
-  } else {
-    setCourseName(courseData.name || data.course_name || 'Unknown Course');
-    setWhatsappLink(
-      courseData.whatsapp_community_link ||
-        'https://chat.whatsapp.com/YOUR_FALLBACK_LINK'
-    );
-  }
-} else {
-  setCourseName(data.course_name || 'Unknown Course');
-  setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
-}
-
-
-
-    } catch (err: any) {
-      console.error('❌ Error fetching payment link:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    // ... rest of your existing code for fetching course name and whatsapp link
+    
+    // Use course_name directly from payment_links
+    if (data.course_name) {
+      setCourseName(data.course_name);
+    } else {
+      setCourseName('Unknown Course');
     }
-  };
+
+    // WhatsApp community link from courses
+    if (data.course_id) {
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('name, whatsapp_community_link')
+        .eq('id', data.course_id)
+        .single();
+
+      if (courseError || !courseData) {
+        console.error('Error fetching course:', courseError);
+        setCourseName(data.course_name || 'Unknown Course');
+        setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
+      } else {
+        setCourseName(courseData.name || data.course_name || 'Unknown Course');
+        setWhatsappLink(
+          courseData.whatsapp_community_link ||
+            'https://chat.whatsapp.com/YOUR_FALLBACK_LINK'
+        );
+      }
+    } else {
+      setCourseName(data.course_name || 'Unknown Course');
+      setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
+    }
+
+  } catch (err: any) {
+    console.error('❌ Error fetching payment link:', err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handlePayment = async () => {
     if (!paymentLink) return;
