@@ -1,4 +1,4 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -6,12 +6,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY as string
 );
 
-// This signature matches what Next 16 expects
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { id: string } }
-): Promise<NextResponse> {
-  const { id } = context.params;
+export async function PATCH(request: any, context: any) {
+  // ⬇️ IMPORTANT: await context.params
+  const params = await context.params;
+  const id = params?.id as string | undefined;
+
+  if (!id) {
+    console.error('PATCH /api/courses/[id]/whatsapp called without id');
+    return NextResponse.json(
+      { error: 'Course id is required' },
+      { status: 400 }
+    );
+  }
+
   const body = await request.json();
   const whatsapp_community_link = body.whatsapp_community_link as string | null;
 
@@ -23,7 +30,7 @@ export async function PATCH(
     .single();
 
   if (error) {
-    console.error(error);
+    console.error('Supabase error updating course:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
