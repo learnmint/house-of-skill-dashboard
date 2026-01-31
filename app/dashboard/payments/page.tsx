@@ -629,7 +629,7 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000
+    zIndex: 30
   }}>
     <div style={{
       backgroundColor: 'white',
@@ -675,7 +675,7 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
             backgroundColor: '#e5e7eb'
           }} />
 
-          {journeyEvents.map((event, index) => {
+          {journeyEvents.map((event) => {
             const eventData = event.event_data || {};
             const isSuccess = event.event_type.includes('captured') || event.event_type.includes('paid');
             const isFailed = event.event_type.includes('failed');
@@ -787,8 +787,9 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
         </div>
       )}
     </div>
-    </div>
-    )}
+  </div>
+)}
+
 
 
       {/* 👇 NEW: Row 2 - Filters and Search */}
@@ -963,62 +964,62 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
                 {/* 👇 NEW: Show creator name */}
                 <td style={{ padding: "12px 8px" }}>{link.creator_name || "-"}</td>
                 <td style={{ padding: "12px 8px" }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {/* 👇 NEW: Copy Link button */}
-                    {link.gateway_link_url && (
-                      <button
-                        onClick={() => handleCopyLink(link.gateway_link_url!)}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: 12,
-                          background: "#3b82f6",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 4,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Copy Link
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setSelectedLink(link);
-                        setCopyMessage("");
-                      }}
-                      style={{
-                        padding: "6px 12px",
-                        fontSize: 12,
-                        background: "#6b7280",
-                        color: "white",
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                      }}
-                    >
-                      View details
-                    </button>
+  <div style={{ display: "flex", gap: 8 }}>
+    {/* Copy Link button */}
+    {link.gateway_link_url && (
+      <button
+        onClick={() => handleCopyLink(link.gateway_link_url!)}
+        style={{
+          padding: "6px 12px",
+          fontSize: 12,
+          background: "#3b82f6",
+          color: "white",
+          border: "none",
+          borderRadius: 4,
+          cursor: "pointer",
+        }}
+      >
+        Copy Link
+      </button>
+    )}
+    
+    {/* View details button */}
+    <button
+      onClick={() => {
+        setSelectedLink(link);
+        setCopyMessage("");
+      }}
+      style={{
+        padding: "6px 12px",
+        fontSize: 12,
+        background: "#6b7280",
+        color: "white",
+        border: "none",
+        borderRadius: 4,
+        cursor: "pointer",
+      }}
+    >
+      View details
+    </button>
 
-                    </button>
+    {/* View Journey button */}
+    <button
+      onClick={() => fetchPaymentJourney(link.id)}
+      style={{
+        padding: "6px 12px",
+        fontSize: 12,
+        background: "#8b5cf6",
+        color: "white",
+        border: "none",
+        borderRadius: 4,
+        cursor: "pointer",
+      }}
+    >
+      View Journey
+    </button>
+  </div>
+</td>
 
-                     {/* NEW: View Journey button */}
-                     <button
-                     onClick={() => fetchPaymentJourney(link.id)}
-                     style={{
-                     padding: '8px 16px',
-                     backgroundColor: '#8b5cf6',
-                     color: 'white',
-                     border: 'none',
-                     borderRadius: '6px',
-                     cursor: 'pointer',
-                     fontSize: '14px',
-                     marginLeft: '8px'
-                     }}
-                     >
-                     View Journey
-                    </button>
-                  </div>
-                </td>
               </tr>
             ))}
             {links.length === 0 && (
