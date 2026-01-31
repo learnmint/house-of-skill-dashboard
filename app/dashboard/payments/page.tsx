@@ -152,58 +152,57 @@ export default function PaymentsPage() {
   }, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
 
   const handleCreateLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setError("Not logged in");
-      setLoading(false);
-      return;
-    }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    setError("Not logged in");
+    setLoading(false);
+    return;
+  }
 
-    if (!selectedCourseId) {
-      setError("Please select a course");
-      setLoading(false);
-      return;
-    }
+  if (!selectedCourseId) {
+    setError("Please select a course");
+    setLoading(false);
+    return;
+  }
 
-    const selectedCourse = courses.find((c) => c.id === selectedCourseId);
+  const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
-    const maxPrice = selectedCourse?.max_price ?? 0;
-    const pitched = pitchedAmount ? Number(pitchedAmount) : 0;
-    const linkAmt = Number(linkAmount);
+  const maxPrice = selectedCourse?.max_price ?? 0;
+  const pitched = pitchedAmount ? Number(pitchedAmount) : 0;
+  const linkAmt = Number(linkAmount);
 
-    const discountAmount = Math.max(maxPrice - pitched, 0);
-    const balanceAmount = Math.max(pitched - linkAmt, 0);
+  const discountAmount = Math.max(maxPrice - pitched, 0);
+  const balanceAmount = Math.max(pitched - linkAmt, 0);
 
-    let paymentStatus: string = "link_created";
-    if (balanceAmount === 0 && linkAmt > 0) {
-      paymentStatus = "paid";
-    } else if (balanceAmount > 0 && linkAmt > 0) {
-      paymentStatus = "partial_paid";
-    }
+  // 👇 FIXED: Default status is "link_created" until payment is actually made
+  // The status will be updated by webhook when customer pays
+  let paymentStatus: string = "link_created";
 
-    const { data: insertData, error: insertError } = await supabase
-      .from("payment_links")
-      .insert({
-        created_by: user.id,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail || null,
-        course_id: selectedCourse ? selectedCourse.id : null,
-        course_name: selectedCourse ? selectedCourse.name : null,
-        pitched_amount: pitched || null,
-        link_amount: linkAmt,
-        state,
-        gateway,
-        status: paymentStatus,
-        discount_amount: discountAmount,
-        balance_amount: balanceAmount,
-      })
-      .select("id")
-      .single();
+  const { data: insertData, error: insertError } = await supabase
+    .from("payment_links")
+    .insert({
+      created_by: user.id,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      customer_email: customerEmail || null,
+      course_id: selectedCourse ? selectedCourse.id : null,
+      course_name: selectedCourse ? selectedCourse.name : null,
+      pitched_amount: pitched || null,
+      link_amount: linkAmt,
+      state,
+      gateway,
+      status: paymentStatus,  // 👈 Always "link_created" initially
+      discount_amount: discountAmount,
+      balance_amount: balanceAmount,
+    })
+    .select("id")
+    .single();
+
+  // ... rest of the code remains same
 
     if (insertError || !insertData) {
       console.error(insertError);
@@ -483,24 +482,22 @@ export default function PaymentsPage() {
 
       {/* View Details popup */}
       {selectedLink && (() => {
-        const selectedCourse = courses.find((c) => c.id === selectedLink.course_id);
-        const maxPrice = selectedCourse?.max_price ?? 0;
-        const pitched = selectedLink.pitched_amount ?? 0;
-        const linkAmt = selectedLink.link_amount;
+  const selectedCourse = courses.find((c) => c.id === selectedLink.course_id);
+  const maxPrice = selectedCourse?.max_price ?? 0;
+  const pitched = selectedLink.pitched_amount ?? 0;
+  const linkAmt = selectedLink.link_amount;
 
-        const paidAmount = linkAmt;
+  // 👇 FIXED: paidAmount should come from actual payment data (from webhook)
+  // For now, if status is "link_created", paidAmount = 0
+  const paidAmount = selectedLink.status === "link_created" ? 0 : linkAmt;
 
-        const balanceAmount = Math.max(pitched - paidAmount, 0);
-        const discountAmount = Math.max(maxPrice - pitched, 0);
+  const balanceAmount = Math.max(pitched - paidAmount, 0);
+  const discountAmount = Math.max(maxPrice - pitched, 0);
 
-        let computedStatus: string = "link_created";
-        if (balanceAmount === 0 && paidAmount > 0) {
-          computedStatus = "paid";
-        } else if (balanceAmount > 0 && paidAmount > 0) {
-          computedStatus = "partial_paid";
-        }
+  // 👇 FIXED: Use the status directly from database
+  const computedStatus = selectedLink.status;
 
-        return (
+  return (
           <div
             style={{
               position: "fixed",
