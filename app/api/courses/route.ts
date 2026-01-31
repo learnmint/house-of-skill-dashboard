@@ -6,20 +6,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY as string
 );
 
-export async function PATCH(
-  request: Request,
-  context: { params: { id: string } }
-) {
-  const { id } = context.params;
-  const body = await request.json();
-  const whatsapp_community_link = body.whatsapp_community_link as string | null;
-
+export async function GET(): Promise<NextResponse> {
   const { data, error } = await supabase
     .from('courses')
-    .update({ whatsapp_community_link })
-    .eq('id', id)
     .select('id, name, whatsapp_community_link')
-    .single();
+    .order('name', { ascending: true });
 
   if (error) {
     console.error(error);
