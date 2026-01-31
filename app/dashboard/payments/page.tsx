@@ -1165,26 +1165,42 @@ const { error: updateError } = await supabase
                 <td style={{ padding: "12px 8px" }}>{link.creator_name || "-"}</td>
                 <td style={{ padding: "12px 8px" }}>
   <div style={{ display: "flex", gap: 8 }}>
+    
     {/* Copy Checkout Link */}
 {link.checkout_link_url && (
   <button
     onClick={() => handleCopyLink(link.checkout_link_url!)}
-    style={{ ...same styles... }}
-  >
+    style={{
+          padding: "6px 12px",
+          fontSize: 12,
+          background: "#3b82f6",
+          color: "white",
+          border: "none",
+          borderRadius: 4,
+          cursor: "pointer",
+        }}
+      >
     Copy Checkout
   </button>
 )}
-
-{/* Copy Gateway Link */}
+    
+   {/* Copy Gateway Link */}
 {link.gateway_link_url && (
   <button
     onClick={() => handleCopyLink(link.gateway_link_url!)}
-    style={{ ...same styles but maybe different color... }}
-  >
+    style={{
+          padding: "6px 12px",
+          fontSize: 12,
+          background: "#d32008",
+          color: "white",
+          border: "none",
+          borderRadius: 4,
+          cursor: "pointer",
+        }}
+      >
     Copy Gateway
   </button>
 )}
-
     
     {/* View details button */}
     <button
