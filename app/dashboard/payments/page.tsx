@@ -26,7 +26,6 @@ type PaymentLink = {
   gateway_link_url: string | null;
   created_at: string;
   discount_amount: number | null;
-  // 👇 NEW: Add these fields if not already in your table
   balance_amount?: number | null;
 };
 
@@ -73,10 +72,9 @@ export default function PaymentsPage() {
   };
 
   const loadLinks = async () => {
-    // 👇 ADD balance_amount, payment_status to the select query
     const { data, error } = await supabase
       .from("payment_links")
-      .select("id, customer_name, customer_phone, customer_email, course_id, course_name, link_amount, gateway, status, gateway_link_url, created_at, pitched_amount, discount_amount, state, balance_amount, payment_status")
+      .select("id, customer_name, customer_phone, customer_email, course_id, course_name, link_amount, gateway, status, gateway_link_url, created_at, pitched_amount, discount_amount, state, balance_amount")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -112,43 +110,39 @@ export default function PaymentsPage() {
 
     const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
-    // 👇 CALCULATE DISCOUNT, BALANCE, PAYMENT_STATUS before inserting
-    // Calculate values (around line 110-125)
-const maxPrice = selectedCourse?.max_price ?? 0;
-const pitched = pitchedAmount ? Number(pitchedAmount) : 0;
-const linkAmt = Number(linkAmount);
+    const maxPrice = selectedCourse?.max_price ?? 0;
+    const pitched = pitchedAmount ? Number(pitchedAmount) : 0;
+    const linkAmt = Number(linkAmount);
 
-const discountAmount = Math.max(maxPrice - pitched, 0);
-const balanceAmount = Math.max(pitched - linkAmt, 0);
+    const discountAmount = Math.max(maxPrice - pitched, 0);
+    const balanceAmount = Math.max(pitched - linkAmt, 0);
 
-// 👇 Determine status based on balance
-let paymentStatus: string = "link_created";
-if (balanceAmount === 0 && linkAmt > 0) {
-  paymentStatus = "paid";
-} else if (balanceAmount > 0 && linkAmt > 0) {
-  paymentStatus = "partial_paid";
-}
+    let paymentStatus: string = "link_created";
+    if (balanceAmount === 0 && linkAmt > 0) {
+      paymentStatus = "paid";
+    } else if (balanceAmount > 0 && linkAmt > 0) {
+      paymentStatus = "partial_paid";
+    }
 
-const { data: insertData, error: insertError } = await supabase
-  .from("payment_links")
-  .insert({
-    created_by: user.id,
-    customer_name: customerName,
-    customer_phone: customerPhone,
-    customer_email: customerEmail || null,
-    course_id: selectedCourse ? selectedCourse.id : null,
-    course_name: selectedCourse ? selectedCourse.name : null,
-    pitched_amount: pitched || null,
-    link_amount: linkAmt,
-    state,
-    gateway,
-    status: paymentStatus,  // 👈 Use existing status column
-    discount_amount: discountAmount,  // 👈 Already exists
-    balance_amount: balanceAmount,    // 👈 New column
-  })
-  .select("id")
-  .single();
-
+    const { data: insertData, error: insertError } = await supabase
+      .from("payment_links")
+      .insert({
+        created_by: user.id,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail || null,
+        course_id: selectedCourse ? selectedCourse.id : null,
+        course_name: selectedCourse ? selectedCourse.name : null,
+        pitched_amount: pitched || null,
+        link_amount: linkAmt,
+        state,
+        gateway,
+        status: paymentStatus,
+        discount_amount: discountAmount,
+        balance_amount: balanceAmount,
+      })
+      .select("id")
+      .single();
 
     if (insertError || !insertData) {
       console.error(insertError);
@@ -365,14 +359,11 @@ const { data: insertData, error: insertError } = await supabase
 
       {/* View Details popup */}
       {selectedLink && (() => {
-        // 👇 COMPUTE VALUES FOR THE SELECTED LINK
         const selectedCourse = courses.find((c) => c.id === selectedLink.course_id);
         const maxPrice = selectedCourse?.max_price ?? 0;
         const pitched = selectedLink.pitched_amount ?? 0;
         const linkAmt = selectedLink.link_amount;
 
-        // For now, assume link_amount = paid_amount (single payment)
-        // Later, you'll sum all payments for this customer+course
         const paidAmount = linkAmt;
 
         const balanceAmount = Math.max(pitched - paidAmount, 0);
@@ -418,7 +409,6 @@ const { data: insertData, error: insertError } = await supabase
               <p>
                 <strong>Payment Amount:</strong> ₹{paidAmount}
               </p>
-              {/* 👇 UPDATED FIELDS */}
               <p>
                 <strong>Balance Amount:</strong> ₹{balanceAmount}
               </p>
