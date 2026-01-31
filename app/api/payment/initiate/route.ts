@@ -4,6 +4,13 @@ import Razorpay from 'razorpay';
 export async function POST(request: NextRequest) {
   console.log('==================== API CALLED ====================');
   
+  // 👇 ADD THIS DEBUGGING
+  console.log('🔍 ALL ENV VARS:', {
+    NEXT_PUBLIC_RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET ? '***EXISTS***' : 'MISSING',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? '***EXISTS***' : 'MISSING',
+  });
+  
   try {
     const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -12,8 +19,14 @@ export async function POST(request: NextRequest) {
     console.log('🔑 Key Secret exists:', !!keySecret);
 
     if (!keyId || !keySecret) {
+      console.error('❌ CREDENTIALS MISSING!');
+      console.error('Key ID present:', !!keyId);
+      console.error('Key Secret present:', !!keySecret);
       throw new Error('Razorpay credentials not found');
     }
+
+    // ... rest of your code
+
 
     const razorpay = new Razorpay({
       key_id: keyId,

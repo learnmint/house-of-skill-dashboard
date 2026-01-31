@@ -535,7 +535,7 @@ export default function PaymentsPage() {
                 <strong>Link Amount:</strong> ₹{linkAmt}
                 </p>
               <p>
-                <strong>Payment Amount:</strong> ₹{paidAmount}
+                <strong>Paid Amount:</strong> ₹{paidAmount}
               </p>
               <p>
                 <strong>Balance Amount:</strong> ₹{balanceAmount}
