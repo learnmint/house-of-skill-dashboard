@@ -77,7 +77,7 @@ export default function OnboardingPage() {
       .select(
         "id, customer_name, customer_phone, customer_email, link_amount, status, onboarding:onboarding(*)"
       )
-      .in("status", ["fully_paid", "partial_paid"])
+      .in("status", ["fully_paid", "partial_paid", "paid"])
       .order("created_at", { ascending: false });
 
     if (error) {
