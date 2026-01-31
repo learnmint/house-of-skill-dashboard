@@ -529,8 +529,11 @@ export default function PaymentsPage() {
               </p>
               {/* 👇 NEW: Show Final Payable Amount */}
               <p>
-                <strong>Final Payable Amount (Pitched):</strong> ₹{pitched}
+                <strong>Final Payable Amount:</strong> ₹{pitched}
               </p>
+              <p>
+                <strong>Link Amount:</strong> ₹{linkAmt}
+                </p>
               <p>
                 <strong>Payment Amount:</strong> ₹{paidAmount}
               </p>
