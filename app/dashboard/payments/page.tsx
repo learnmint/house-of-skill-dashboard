@@ -26,6 +26,8 @@ type PaymentLink = {
   gateway_link_url: string | null;
   created_at: string;
   discount_amount: number | null;
+  // 👇 NEW: Add these fields if not already in your table
+  balance_amount?: number | null;
 };
 
 export default function PaymentsPage() {
@@ -71,9 +73,10 @@ export default function PaymentsPage() {
   };
 
   const loadLinks = async () => {
+    // 👇 ADD balance_amount, payment_status to the select query
     const { data, error } = await supabase
       .from("payment_links")
-      .select("id, customer_name, customer_phone, customer_email, course_id, course_name, link_amount, gateway, status, gateway_link_url, created_at, pitched_amount, discount_amount, state")
+      .select("id, customer_name, customer_phone, customer_email, course_id, course_name, link_amount, gateway, status, gateway_link_url, created_at, pitched_amount, discount_amount, state, balance_amount, payment_status")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -109,23 +112,43 @@ export default function PaymentsPage() {
 
     const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
-    const { data: insertData, error: insertError } = await supabase
-      .from("payment_links")
-      .insert({
-        created_by: user.id,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail || null,
-        course_id: selectedCourse ? selectedCourse.id : null,
-        course_name: selectedCourse ? selectedCourse.name : null,
-        pitched_amount: pitchedAmount ? Number(pitchedAmount) : null,
-        link_amount: Number(linkAmount),
-        state,
-        gateway,
-        status: "link_created",
-      })
-      .select("id")
-      .single();
+    // 👇 CALCULATE DISCOUNT, BALANCE, PAYMENT_STATUS before inserting
+    // Calculate values (around line 110-125)
+const maxPrice = selectedCourse?.max_price ?? 0;
+const pitched = pitchedAmount ? Number(pitchedAmount) : 0;
+const linkAmt = Number(linkAmount);
+
+const discountAmount = Math.max(maxPrice - pitched, 0);
+const balanceAmount = Math.max(pitched - linkAmt, 0);
+
+// 👇 Determine status based on balance
+let paymentStatus: string = "link_created";
+if (balanceAmount === 0 && linkAmt > 0) {
+  paymentStatus = "paid";
+} else if (balanceAmount > 0 && linkAmt > 0) {
+  paymentStatus = "partial_paid";
+}
+
+const { data: insertData, error: insertError } = await supabase
+  .from("payment_links")
+  .insert({
+    created_by: user.id,
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    customer_email: customerEmail || null,
+    course_id: selectedCourse ? selectedCourse.id : null,
+    course_name: selectedCourse ? selectedCourse.name : null,
+    pitched_amount: pitched || null,
+    link_amount: linkAmt,
+    state,
+    gateway,
+    status: paymentStatus,  // 👈 Use existing status column
+    discount_amount: discountAmount,  // 👈 Already exists
+    balance_amount: balanceAmount,    // 👈 New column
+  })
+  .select("id")
+  .single();
+
 
     if (insertError || !insertData) {
       console.error(insertError);
@@ -143,7 +166,7 @@ export default function PaymentsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: Number(linkAmount),
+            amount: linkAmt,
             customer_name: customerName,
             customer_email: customerEmail,
             customer_phone: customerPhone,
@@ -341,92 +364,115 @@ export default function PaymentsPage() {
       )}
 
       {/* View Details popup */}
-      {selectedLink && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 20,
-          }}
-        >
-          <div style={{ background: "white", padding: 24, borderRadius: 8, width: 450 }}>
-            <h2>Enrollment Form</h2>
+      {selectedLink && (() => {
+        // 👇 COMPUTE VALUES FOR THE SELECTED LINK
+        const selectedCourse = courses.find((c) => c.id === selectedLink.course_id);
+        const maxPrice = selectedCourse?.max_price ?? 0;
+        const pitched = selectedLink.pitched_amount ?? 0;
+        const linkAmt = selectedLink.link_amount;
 
-            <p>
-              <strong>Customer Name:</strong> {selectedLink.customer_name}
-            </p>
-            <p>
-              <strong>Email:</strong> {selectedLink.customer_email || "-"}
-            </p>
-            <p>
-              <strong>Mobile Number:</strong> {selectedLink.customer_phone}
-            </p>
-            <p>
-              <strong>Course Name:</strong> {selectedLink.course_name || "-"}
-            </p>
-            <p>
-              <strong>Course Fees:</strong> {selectedLink.pitched_amount ?? "-"}
-            </p>
-            <p>
-              <strong>Payment Amount:</strong> {selectedLink.link_amount}
-            </p>
-            <p>
-              <strong>Balance Amount:</strong> (we'll compute when partial payments exist)
-            </p>
-            <p>
-              <strong>Discount Amount:</strong> {selectedLink.discount_amount ?? 0}
-            </p>
-            <p>
-              <strong>Payment Status:</strong> {selectedLink.status}
-            </p>
+        // For now, assume link_amount = paid_amount (single payment)
+        // Later, you'll sum all payments for this customer+course
+        const paidAmount = linkAmt;
 
-            <div style={{ marginTop: 12 }}>
+        const balanceAmount = Math.max(pitched - paidAmount, 0);
+        const discountAmount = Math.max(maxPrice - pitched, 0);
+
+        let computedStatus: string = "link_created";
+        if (balanceAmount === 0 && paidAmount > 0) {
+          computedStatus = "paid";
+        } else if (balanceAmount > 0 && paidAmount > 0) {
+          computedStatus = "partial_paid";
+        }
+
+        return (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 20,
+            }}
+          >
+            <div style={{ background: "white", padding: 24, borderRadius: 8, width: 450 }}>
+              <h2>Enrollment Form</h2>
+
               <p>
-                <strong>Payment Link:</strong>
+                <strong>Customer Name:</strong> {selectedLink.customer_name}
               </p>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 12, wordBreak: "break-all" }}>
-                  {selectedLink.gateway_link_url || "(not generated yet)"}
-                </span>
+              <p>
+                <strong>Email:</strong> {selectedLink.customer_email || "-"}
+              </p>
+              <p>
+                <strong>Mobile Number:</strong> {selectedLink.customer_phone}
+              </p>
+              <p>
+                <strong>Course Name:</strong> {selectedLink.course_name || "-"}
+              </p>
+              <p>
+                <strong>Course Fees:</strong> ₹{maxPrice}
+              </p>
+              <p>
+                <strong>Payment Amount:</strong> ₹{paidAmount}
+              </p>
+              {/* 👇 UPDATED FIELDS */}
+              <p>
+                <strong>Balance Amount:</strong> ₹{balanceAmount}
+              </p>
+              <p>
+                <strong>Discount Amount:</strong> ₹{discountAmount}
+              </p>
+              <p>
+                <strong>Payment Status:</strong> {computedStatus}
+              </p>
+
+              <div style={{ marginTop: 12 }}>
+                <p>
+                  <strong>Payment Link:</strong>
+                </p>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, wordBreak: "break-all" }}>
+                    {selectedLink.gateway_link_url || "(not generated yet)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!selectedLink.gateway_link_url) return;
+                      try {
+                        await navigator.clipboard.writeText(selectedLink.gateway_link_url);
+                        setCopyMessage("Link copied!");
+                      } catch (e) {
+                        setCopyMessage("Could not copy");
+                      }
+                    }}
+                  >
+                    Copy link
+                  </button>
+                </div>
+                {copyMessage && <p style={{ fontSize: 12 }}>{copyMessage}</p>}
+              </div>
+
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!selectedLink.gateway_link_url) return;
-                    try {
-                      await navigator.clipboard.writeText(selectedLink.gateway_link_url);
-                      setCopyMessage("Link copied!");
-                    } catch (e) {
-                      setCopyMessage("Could not copy");
-                    }
+                  onClick={() => {
+                    alert("Invoice download will be added later.");
                   }}
                 >
-                  Copy link
+                  Invoice
+                </button>
+
+                <button type="button" onClick={() => setSelectedLink(null)}>
+                  Close
                 </button>
               </div>
-              {copyMessage && <p style={{ fontSize: 12 }}>{copyMessage}</p>}
-            </div>
-
-            <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  alert("Invoice download will be added later.");
-                }}
-              >
-                Invoice
-              </button>
-
-              <button type="button" onClick={() => setSelectedLink(null)}>
-                Close
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Row 2 - filters (placeholder for now) */}
       <div style={{ marginBottom: 12 }}>
