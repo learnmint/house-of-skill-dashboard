@@ -202,6 +202,19 @@ export default function CheckoutPage() {
     try {
       console.log('🔵 Initiating payment for:', paymentLink.id);
 
+      const { error: updateError } = await supabase
+    .from('payment_links')
+    .update({
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      customer_email: customerEmail || null,
+    })
+    .eq('id', paymentLink.id);
+
+  if (updateError) {
+    console.error('❌ Failed to update customer details:', updateError);
+  }
+
       const response = await fetch('/api/payment/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

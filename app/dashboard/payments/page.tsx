@@ -23,7 +23,8 @@ type PaymentLink = {
   state: string | null;
   gateway: string;
   status: string;
-  gateway_link_url: string | null;
+  gateway_link_url: string | null;      // direct gateway URL (Razorpay/Cashfree/Zoho)
+  checkout_link_url?: string | null;    // NEW: your /checkout/[id] URL
   created_at: string;
   discount_amount: number | null;
   balance_amount?: number | null;
@@ -104,25 +105,26 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
   // 👇 UPDATED: Use full_name instead of name
   let query = supabase
     .from("payment_links")
-    .select(`
-      id, 
-      customer_name, 
-      customer_phone, 
-      customer_email, 
-      course_id, 
-      course_name, 
-      link_amount, 
-      gateway, 
-      status, 
-      gateway_link_url, 
-      created_at, 
-      pitched_amount, 
-      discount_amount, 
-      state, 
-      balance_amount,
-      created_by,
-      profiles!payment_links_created_by_fkey(full_name)
-    `)
+     .select(`
+    id, 
+    customer_name, 
+    customer_phone, 
+    customer_email, 
+    course_id, 
+    course_name, 
+    link_amount, 
+    gateway, 
+    status, 
+    gateway_link_url,      -- gateway direct URL
+    checkout_link_url,     -- NEW
+    created_at, 
+    pitched_amount, 
+    discount_amount, 
+    state, 
+    balance_amount,
+    created_by,
+    profiles!payment_links_created_by_fkey(full_name)
+  `)
     .order("created_at", { ascending: false });
 
   // Apply filters
@@ -171,6 +173,10 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
   useEffect(() => {
     loadLinks();
   }, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
+  useEffect(() => {
+  loadLinks();
+}, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
+
 
   const handleCreateLink = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -257,18 +263,19 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
           setError(data.error || "Failed to create Razorpay link");
         } else {
           razorpayUrl = data.url;
-          razorpayId = data.id;
+razorpayId = data.id;
 
-          // 👇 NEW: Create checkout page URL
-          checkoutPageUrl = `${window.location.origin}/checkout/${insertData.id}`;
+// Create checkout page URL
+checkoutPageUrl = `${window.location.origin}/checkout/${insertData.id}`;
 
-          const { error: updateError } = await supabase
-            .from("payment_links")
-            .update({
-              gateway_link_id: razorpayId,
-              gateway_link_url: checkoutPageUrl, // 👈 Store checkout page URL instead
-            })
-            .eq("id", insertData.id);
+const { error: updateError } = await supabase
+  .from("payment_links")
+  .update({
+    gateway_link_id: razorpayId,
+    gateway_link_url: razorpayUrl,       // direct gateway URL (razorpay)
+    checkout_link_url: checkoutPageUrl,  // your hosted checkout page
+  })
+  .eq("id", insertData.id);
 
           if (updateError) {
             console.error(updateError);
@@ -573,29 +580,58 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
               </p>
 
               <div style={{ marginTop: 12 }}>
-                <p>
-                  <strong>Payment Link:</strong>
-                </p>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, wordBreak: "break-all" }}>
-                    {selectedLink.gateway_link_url || "(not generated yet)"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!selectedLink.gateway_link_url) return;
-                      try {
-                        await navigator.clipboard.writeText(selectedLink.gateway_link_url);
-                        setCopyMessage("Link copied!");
-                      } catch (e) {
-                        setCopyMessage("Could not copy");
-                      }
-                    }}
-                  >
-                    Copy link
-                  </button>
-                </div>
-                {copyMessage && <p style={{ fontSize: 12 }}>{copyMessage}</p>}
+                {/* Checkout Page Link */}
+<p>
+  <strong>Checkout Page Link:</strong>
+</p>
+<div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+  <span style={{ fontSize: 12, wordBreak: "break-all" }}>
+    {selectedLink.checkout_link_url || "(not generated yet)"}
+  </span>
+  {selectedLink.checkout_link_url && (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(selectedLink.checkout_link_url!);
+          setCopyMessage("Checkout link copied!");
+        } catch (e) {
+          setCopyMessage("Could not copy checkout link");
+        }
+      }}
+    >
+      Copy checkout
+    </button>
+  )}
+</div>
+
+{/* Gateway Direct Link */}
+<p>
+  <strong>Gateway Link:</strong>
+</p>
+<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+  <span style={{ fontSize: 12, wordBreak: "break-all" }}>
+    {selectedLink.gateway_link_url || "(not generated yet)"}
+  </span>
+  {selectedLink.gateway_link_url && (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(selectedLink.gateway_link_url!);
+          setCopyMessage("Gateway link copied!");
+        } catch (e) {
+          setCopyMessage("Could not copy gateway link");
+        }
+      }}
+    >
+      Copy gateway
+    </button>
+  )}
+</div>
+
+{copyMessage && <p style={{ fontSize: 12 }}>{copyMessage}</p>}
+
               </div>
 
               <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
@@ -1129,23 +1165,26 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
                 <td style={{ padding: "12px 8px" }}>{link.creator_name || "-"}</td>
                 <td style={{ padding: "12px 8px" }}>
   <div style={{ display: "flex", gap: 8 }}>
-    {/* Copy Link button */}
-    {link.gateway_link_url && (
-      <button
-        onClick={() => handleCopyLink(link.gateway_link_url!)}
-        style={{
-          padding: "6px 12px",
-          fontSize: 12,
-          background: "#3b82f6",
-          color: "white",
-          border: "none",
-          borderRadius: 4,
-          cursor: "pointer",
-        }}
-      >
-        Copy Link
-      </button>
-    )}
+    {/* Copy Checkout Link */}
+{link.checkout_link_url && (
+  <button
+    onClick={() => handleCopyLink(link.checkout_link_url!)}
+    style={{ ...same styles... }}
+  >
+    Copy Checkout
+  </button>
+)}
+
+{/* Copy Gateway Link */}
+{link.gateway_link_url && (
+  <button
+    onClick={() => handleCopyLink(link.gateway_link_url!)}
+    style={{ ...same styles but maybe different color... }}
+  >
+    Copy Gateway
+  </button>
+)}
+
     
     {/* View details button */}
     <button
