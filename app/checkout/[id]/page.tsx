@@ -52,25 +52,52 @@ export default function CheckoutPage() {
     fetchPaymentLink();
   }, [id]);
 
-  const fetchPaymentLink = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payment_links')
-        .select('*')
-        .eq('id', id)
-        .single();
+ const fetchPaymentLink = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('payment_links')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (error) throw error;
+    if (error) throw error;
+    
+    console.log('✅ Fetched payment link data:', data);
+    
+    // 👇 NEW: Check if already paid
+    if (data.status === 'paid') {
+      console.log('✅ Payment already completed, redirecting to success page');
       
-      console.log('✅ Fetched payment link data:', data);
+      // Fetch course details for success page
+      let whatsappLink = 'https://chat.whatsapp.com/YOUR_FALLBACK_LINK';
+      let courseName = data.course_name || 'Unknown Course';
       
-      setPaymentLink(data);
-      console.log('💰 Link Amount:', data.link_amount, 'Pitched Amount:', data.pitched_amount);
+      if (data.course_id) {
+        const { data: courseData } = await supabase
+          .from('courses')
+          .select('name, whatsapp_community_link')
+          .eq('id', data.course_id)
+          .single();
+        
+        if (courseData) {
+          courseName = courseData.name || courseName;
+          whatsappLink = courseData.whatsapp_community_link || whatsappLink;
+        }
+      }
+      
+      // Redirect to success page
+      const successUrl = `/success?course=${encodeURIComponent(courseName)}&whatsapp=${encodeURIComponent(whatsappLink)}`;
+      window.location.href = successUrl;
+      return; // Stop execution
+    }
+    
+    setPaymentLink(data);
+    console.log('💰 Link Amount:', data.link_amount, 'Pitched Amount:', data.pitched_amount);
 
-      // Pre-fill the form with existing data
-      setCustomerName(data.customer_name || '');
-      setCustomerPhone(data.customer_phone || '');
-      setCustomerEmail(data.customer_email || '');
+    // Pre-fill the form with existing data
+    setCustomerName(data.customer_name || '');
+    setCustomerPhone(data.customer_phone || '');
+    setCustomerEmail(data.customer_email || '');
 
       // Fetch course name 
 // Use course_name directly from payment_links

@@ -55,6 +55,27 @@ export default function PaymentsPage() {
   const [state, setState] = useState("");
   const [gateway, setGateway] = useState("razorpay");
   const [error, setError] = useState("");
+  
+const [selectedLinkForJourney, setSelectedLinkForJourney] = useState<string | null>(null);
+const [journeyEvents, setJourneyEvents] = useState<any[]>([]);
+
+// Add the fetch function
+const fetchPaymentJourney = async (paymentLinkId: string) => {
+  const { data, error } = await supabase
+    .from('payment_events')
+    .select('*')
+    .eq('payment_link_id', paymentLinkId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching journey:', error);
+    return;
+  }
+
+  setJourneyEvents(data || []);
+  setSelectedLinkForJourney(paymentLinkId);
+};
+
 
   const loadCourses = async () => {
     const { data, error } = await supabase
@@ -596,6 +617,180 @@ export default function PaymentsPage() {
         );
       })()}
 
+      {/* Payment Journey Modal */}
+{selectedLinkForJourney && (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  }}>
+    <div style={{
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '32px',
+      maxWidth: '700px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflowY: 'auto'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, fontSize: '24px' }}>Payment Journey</h2>
+        <button
+          onClick={() => {
+            setSelectedLinkForJourney(null);
+            setJourneyEvents([]);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            fontSize: '24px',
+            cursor: 'pointer',
+            color: '#6b7280'
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {journeyEvents.length === 0 ? (
+        <p style={{ color: '#6b7280', textAlign: 'center', padding: '40px 0' }}>
+          No payment events yet. Events will appear once the customer starts the payment process.
+        </p>
+      ) : (
+        <div style={{ position: 'relative', paddingLeft: '40px' }}>
+          {/* Timeline line */}
+          <div style={{
+            position: 'absolute',
+            left: '15px',
+            top: '10px',
+            bottom: '10px',
+            width: '2px',
+            backgroundColor: '#e5e7eb'
+          }} />
+
+          {journeyEvents.map((event, index) => {
+            const eventData = event.event_data || {};
+            const isSuccess = event.event_type.includes('captured') || event.event_type.includes('paid');
+            const isFailed = event.event_type.includes('failed');
+
+            return (
+              <div key={event.id} style={{ marginBottom: '32px', position: 'relative' }}>
+                {/* Timeline dot */}
+                <div style={{
+                  position: 'absolute',
+                  left: '-33px',
+                  top: '5px',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  backgroundColor: isSuccess ? '#22c55e' : isFailed ? '#ef4444' : '#3b82f6',
+                  border: '3px solid white',
+                  boxShadow: '0 0 0 2px ' + (isSuccess ? '#22c55e' : isFailed ? '#ef4444' : '#3b82f6')
+                }} />
+
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: '600', color: '#1f2937', textTransform: 'capitalize' }}>
+                      {event.event_type.replace(/_/g, ' ')}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                      {new Date(event.created_at).toLocaleString('en-IN', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      })}
+                    </span>
+                  </div>
+
+                  {/* Event Details */}
+                  <div style={{ fontSize: '14px', color: '#4b5563', marginTop: '12px' }}>
+                    {eventData.method && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Payment Method:</strong>{' '}
+                        <span style={{ textTransform: 'uppercase' }}>{eventData.method}</span>
+                        {eventData.method === 'card' && eventData.card_network && ` (${eventData.card_network})`}
+                        {eventData.method === 'upi' && eventData.vpa && ` (${eventData.vpa})`}
+                        {eventData.method === 'wallet' && eventData.wallet && ` (${eventData.wallet})`}
+                        {eventData.emi_duration && ` (${eventData.emi_duration} months EMI)`}
+                      </div>
+                    )}
+
+                    {eventData.amount && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Amount:</strong> ₹{eventData.amount.toFixed(2)}
+                      </div>
+                    )}
+
+                    {eventData.status && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Status:</strong>{' '}
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: isSuccess ? '#dcfce7' : isFailed ? '#fee2e2' : '#dbeafe',
+                          color: isSuccess ? '#166534' : isFailed ? '#991b1b' : '#1e40af',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}>
+                          {eventData.status}
+                        </span>
+                      </div>
+                    )}
+
+                    {eventData.bank && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Bank:</strong> {eventData.bank}
+                      </div>
+                    )}
+
+                    {eventData.error_description && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        backgroundColor: '#fef2f2',
+                        borderLeft: '4px solid #ef4444',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>
+                          Failure Reason:
+                        </div>
+                        <div style={{ color: '#dc2626' }}>{eventData.error_description}</div>
+                        {eventData.error_reason && (
+                          <div style={{ color: '#7f1d1d', fontSize: '12px', marginTop: '4px' }}>
+                            ({eventData.error_reason})
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {eventData.razorpay_payment_id && (
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px' }}>
+                        Payment ID: {eventData.razorpay_payment_id}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+    </div>
+    )}
+
+
       {/* 👇 NEW: Row 2 - Filters and Search */}
       <div style={{ marginBottom: 16, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -802,6 +997,25 @@ export default function PaymentsPage() {
                       }}
                     >
                       View details
+                    </button>
+
+                    </button>
+
+                     {/* NEW: View Journey button */}
+                     <button
+                     onClick={() => fetchPaymentJourney(link.id)}
+                     style={{
+                     padding: '8px 16px',
+                     backgroundColor: '#8b5cf6',
+                     color: 'white',
+                     border: 'none',
+                     borderRadius: '6px',
+                     cursor: 'pointer',
+                     fontSize: '14px',
+                     marginLeft: '8px'
+                     }}
+                     >
+                     View Journey
                     </button>
                   </div>
                 </td>

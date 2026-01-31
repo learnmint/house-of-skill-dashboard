@@ -1,84 +1,128 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-// Using anon key is enough here because RLS is disabled on payment_links.
-// Later we can switch to a service role key if needed.
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
+    const body = await req.text();
+    const signature = req.headers.get('x-razorpay-signature');
 
-    // Basic logging (you can remove later)
-    console.log("Razorpay webhook received:", JSON.stringify(payload));
-
-    const event = payload.event as string;
-    const linkEntity = payload.payload?.payment_link?.entity;
-    if (!linkEntity) {
-      return NextResponse.json({ message: "No payment_link entity" }, { status: 200 });
+    if (!signature) {
+      return NextResponse.json({ error: 'No signature' }, { status: 400 });
     }
 
-    const razorpayLinkId = linkEntity.id as string | undefined;
-    const statusFromRazorpay = linkEntity.status as string | undefined;
-    const paidAmount = linkEntity.amount_paid as number | undefined; // in paise
+    // Verify webhook signature
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(body)
+      .digest('hex');
 
-    if (!razorpayLinkId) {
-      return NextResponse.json({ message: "No payment link id" }, { status: 200 });
+    if (signature !== expectedSignature) {
+      console.error('❌ Invalid webhook signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Map Razorpay status / event to our status values
-    // See: https://razorpay.com/docs/webhooks/payment-links/ [web:73]
-    let appStatus = "payment_pending";
+    const event = JSON.parse(body);
+    console.log('✅ Razorpay Webhook Event:', event.event);
 
-    switch (statusFromRazorpay) {
-      case "created":
-      case "active":
-        appStatus = "payment_pending";
-        break;
-      case "cancelled":
-        appStatus = "payment_failed";
-        break;
-      case "expired":
-        appStatus = "payment_failed";
-        break;
-      case "paid":
-        appStatus = "fully_paid";
-        break;
-      case "partially_paid":
-        appStatus = "partial_paid";
-        break;
-      default:
-        appStatus = "payment_pending";
+    // Extract payment link ID from order notes
+    const paymentLinkId = event.payload?.payment?.entity?.notes?.payment_link_id ||
+                          event.payload?.order?.entity?.notes?.payment_link_id;
+
+    if (!paymentLinkId) {
+      console.log('⚠️ No payment_link_id in webhook');
+      return NextResponse.json({ received: true });
     }
 
-    const amountPaidInRupees =
-      typeof paidAmount === "number" ? paidAmount / 100 : null;
+    // Map Razorpay events to our event types
+    const eventTypeMap: { [key: string]: string } = {
+      'payment.authorized': 'payment_authorized',
+      'payment.captured': 'payment_captured',
+      'payment.failed': 'payment_failed',
+      'order.paid': 'order_paid',
+      'payment.pending': 'payment_pending',
+    };
 
-    const { error: updateError } = await supabase
-      .from("payment_links")
-      .update({
-        status: appStatus,
-        amount_paid: amountPaidInRupees,
-        last_status_update: new Date().toISOString(),
-      })
-      .eq("gateway_link_id", razorpayLinkId);
+    const eventType = eventTypeMap[event.event] || event.event;
 
-    if (updateError) {
-      console.error("Failed to update payment_links from webhook:", updateError);
-      return NextResponse.json(
-        { error: "DB update failed" },
-        { status: 500 }
-      );
+    // Extract useful data
+    const eventData: any = {
+      razorpay_payment_id: event.payload?.payment?.entity?.id,
+      razorpay_order_id: event.payload?.payment?.entity?.order_id || event.payload?.order?.entity?.id,
+      amount: event.payload?.payment?.entity?.amount / 100, // Convert from paise
+      method: event.payload?.payment?.entity?.method, // upi, card, netbanking, wallet, emi
+      status: event.payload?.payment?.entity?.status,
+      error_code: event.payload?.payment?.entity?.error_code,
+      error_description: event.payload?.payment?.entity?.error_description,
+      error_reason: event.payload?.payment?.entity?.error_reason,
+      vpa: event.payload?.payment?.entity?.vpa, // UPI ID
+      card_network: event.payload?.payment?.entity?.card?.network, // Visa, Mastercard, etc.
+      bank: event.payload?.payment?.entity?.bank,
+      wallet: event.payload?.payment?.entity?.wallet,
+      emi_duration: event.payload?.payment?.entity?.emi_duration,
+    };
+
+    // Insert event into database
+    const { error: insertError } = await supabase
+      .from('payment_events')
+      .insert({
+        payment_link_id: paymentLinkId,
+        event_type: eventType,
+        event_data: eventData,
+        razorpay_event_id: event.payload?.payment?.entity?.id || event.payload?.order?.entity?.id,
+      });
+
+    if (insertError) {
+      console.error('❌ Error inserting payment event:', insertError);
     }
 
-    return NextResponse.json({ received: true }, { status: 200 });
-  } catch (err: any) {
-    console.error("Webhook handler error:", err);
+    // Update payment_links table based on event
+    if (event.event === 'payment.captured' || event.event === 'order.paid') {
+      const amount = event.payload?.payment?.entity?.amount / 100;
+      
+      // Get current payment link
+      const { data: paymentLink } = await supabase
+        .from('payment_links')
+        .select('pitched_amount, link_amount')
+        .eq('id', paymentLinkId)
+        .single();
+
+      if (paymentLink) {
+        const pitchedAmount = paymentLink.pitched_amount || 0;
+        const paidAmount = amount;
+        const balanceAmount = Math.max(pitchedAmount - paidAmount, 0);
+
+        let newStatus = 'paid';
+        if (balanceAmount > 0) {
+          newStatus = 'partial_paid';
+        }
+
+        await supabase
+          .from('payment_links')
+          .update({
+            status: newStatus,
+            balance_amount: balanceAmount,
+          })
+          .eq('id', paymentLinkId);
+      }
+    } else if (event.event === 'payment.failed') {
+      await supabase
+        .from('payment_links')
+        .update({ status: 'failed' })
+        .eq('id', paymentLinkId);
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error: any) {
+    console.error('❌ Webhook error:', error);
     return NextResponse.json(
-      { error: "Server error", detail: err?.message },
+      { error: 'Webhook processing failed', details: error.message },
       { status: 500 }
     );
   }
