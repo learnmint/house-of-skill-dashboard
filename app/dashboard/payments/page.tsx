@@ -27,6 +27,8 @@ type PaymentLink = {
   created_at: string;
   discount_amount: number | null;
   balance_amount?: number | null;
+  created_by?: string; // 👈 NEW: User ID who created the link
+  creator_name?: string; // 👈 NEW: Name of creator (from profiles join)
 };
 
 export default function PaymentsPage() {
@@ -37,6 +39,12 @@ export default function PaymentsPage() {
   const [copyMessage, setCopyMessage] = useState("");
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+
+  // 👇 NEW: Filter states
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // form fields
   const [customerName, setCustomerName] = useState("");
@@ -72,23 +80,76 @@ export default function PaymentsPage() {
   };
 
   const loadLinks = async () => {
-    const { data, error } = await supabase
-      .from("payment_links")
-      .select("id, customer_name, customer_phone, customer_email, course_id, course_name, link_amount, gateway, status, gateway_link_url, created_at, pitched_amount, discount_amount, state, balance_amount")
-      .order("created_at", { ascending: false })
-      .limit(50);
+  // 👇 UPDATED: Use full_name instead of name
+  let query = supabase
+    .from("payment_links")
+    .select(`
+      id, 
+      customer_name, 
+      customer_phone, 
+      customer_email, 
+      course_id, 
+      course_name, 
+      link_amount, 
+      gateway, 
+      status, 
+      gateway_link_url, 
+      created_at, 
+      pitched_amount, 
+      discount_amount, 
+      state, 
+      balance_amount,
+      created_by,
+      profiles!payment_links_created_by_fkey(full_name)
+    `)
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(error);
-    } else {
-      setLinks(data as PaymentLink[]);
-    }
-  };
+  // Apply filters
+  if (filterStatus !== "all") {
+    query = query.eq("status", filterStatus);
+  }
+
+  if (filterDateFrom) {
+    query = query.gte("created_at", new Date(filterDateFrom).toISOString());
+  }
+
+  if (filterDateTo) {
+    const endDate = new Date(filterDateTo);
+    endDate.setHours(23, 59, 59, 999);
+    query = query.lte("created_at", endDate.toISOString());
+  }
+
+  if (searchQuery.trim()) {
+    query = query.or(
+      `customer_name.ilike.%${searchQuery}%,customer_phone.ilike.%${searchQuery}%,customer_email.ilike.%${searchQuery}%`
+    );
+  }
+
+  query = query.limit(50);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error(error);
+  } else {
+    // 👇 Map the joined profile data - use full_name
+    const formattedData = (data || []).map((link: any) => ({
+      ...link,
+      creator_name: link.profiles?.full_name || "Unknown",
+    }));
+    setLinks(formattedData as PaymentLink[]);
+  }
+};
 
   useEffect(() => {
     loadLinks();
     loadCourses();
   }, []);
+
+  // 👇 NEW: Reload when filters change
+  useEffect(() => {
+    loadLinks();
+  }, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
 
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +214,7 @@ export default function PaymentsPage() {
 
     let razorpayUrl: string | null = null;
     let razorpayId: string | null = null;
+    let checkoutPageUrl: string | null = null; // 👈 NEW
 
     if (gateway === "razorpay") {
       try {
@@ -177,11 +239,14 @@ export default function PaymentsPage() {
           razorpayUrl = data.url;
           razorpayId = data.id;
 
+          // 👇 NEW: Create checkout page URL
+          checkoutPageUrl = `${window.location.origin}/checkout/${insertData.id}`;
+
           const { error: updateError } = await supabase
             .from("payment_links")
             .update({
               gateway_link_id: razorpayId,
-              gateway_link_url: razorpayUrl,
+              gateway_link_url: checkoutPageUrl, // 👈 Store checkout page URL instead
             })
             .eq("id", insertData.id);
 
@@ -209,8 +274,67 @@ export default function PaymentsPage() {
     await loadLinks();
   };
 
+  // 👇 NEW: Download CSV report
+  const handleDownloadReport = () => {
+    const headers = [
+      "Created At",
+      "Customer Name",
+      "Phone",
+      "Email",
+      "Course",
+      "Pitched Amount",
+      "Link Amount",
+      "Balance",
+      "Discount",
+      "Status",
+      "Gateway",
+      "State",
+      "Created By",
+      "Payment Link",
+    ];
+
+    const rows = links.map((link) => [
+      new Date(link.created_at).toLocaleString(),
+      link.customer_name,
+      link.customer_phone,
+      link.customer_email || "",
+      link.course_name || "",
+      link.pitched_amount || "",
+      link.link_amount,
+      link.balance_amount || "",
+      link.discount_amount || "",
+      link.status,
+      link.gateway,
+      link.state || "",
+      link.creator_name || "",
+      link.gateway_link_url || "",
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const downloadLink = document.createElement("a");
+    downloadLink.setAttribute("href", encodedUri);
+    downloadLink.setAttribute("download", `payment_links_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  };
+
+  // 👇 NEW: Copy link helper
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Link copied to clipboard!");
+    } catch (e) {
+      alert("Failed to copy link");
+    }
+  };
+
   return (
-    <div>
+    <div style={{ padding: "20px" }}>
       <h1>Payments</h1>
 
       {/* Row 1 - Generate Link button */}
@@ -404,7 +528,11 @@ export default function PaymentsPage() {
                 <strong>Course Name:</strong> {selectedLink.course_name || "-"}
               </p>
               <p>
-                <strong>Course Fees:</strong> ₹{maxPrice}
+                <strong>Course Fees (Max Price):</strong> ₹{maxPrice}
+              </p>
+              {/* 👇 NEW: Show Final Payable Amount */}
+              <p>
+                <strong>Final Payable Amount (Pitched):</strong> ₹{pitched}
               </p>
               <p>
                 <strong>Payment Amount:</strong> ₹{paidAmount}
@@ -417,6 +545,10 @@ export default function PaymentsPage() {
               </p>
               <p>
                 <strong>Payment Status:</strong> {computedStatus}
+              </p>
+              {/* 👇 NEW: Show Created By */}
+              <p>
+                <strong>Created By:</strong> {selectedLink.creator_name || "Unknown"}
               </p>
 
               <div style={{ marginTop: 12 }}>
@@ -464,54 +596,227 @@ export default function PaymentsPage() {
         );
       })()}
 
-      {/* Row 2 - filters (placeholder for now) */}
-      <div style={{ marginBottom: 12 }}>
-        <strong>Filters</strong> (we will implement Status/Date filters next)
+      {/* 👇 NEW: Row 2 - Filters and Search */}
+      <div style={{ marginBottom: 16, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+          {/* Search */}
+          <div style={{ flex: "1 1 200px" }}>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              Search
+            </label>
+            <input
+              type="text"
+              placeholder="Name, Phone, Email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: "100%", padding: "6px 12px", borderRadius: 4, border: "1px solid #ddd" }}
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ flex: "0 1 150px" }}>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              Status
+            </label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{ width: "100%", padding: "6px 12px", borderRadius: 4, border: "1px solid #ddd" }}
+            >
+              <option value="all">All</option>
+              <option value="link_created">Link Created</option>
+              <option value="partial_paid">Partial Paid</option>
+              <option value="paid">Paid</option>
+              <option value="fully_paid">Fully Paid</option>
+            </select>
+          </div>
+
+          {/* Date From */}
+          <div style={{ flex: "0 1 150px" }}>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              From Date
+            </label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+              style={{ width: "100%", padding: "6px 12px", borderRadius: 4, border: "1px solid #ddd" }}
+            />
+          </div>
+
+          {/* Date To */}
+          <div style={{ flex: "0 1 150px" }}>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+              To Date
+            </label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+              style={{ width: "100%", padding: "6px 12px", borderRadius: 4, border: "1px solid #ddd" }}
+            />
+          </div>
+
+          {/* Download Report */}
+          <div style={{ flex: "0 1 auto" }}>
+            <button
+              onClick={handleDownloadReport}
+              style={{
+                padding: "7px 16px",
+                background: "#10b981",
+                color: "white",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              Download CSV
+            </button>
+          </div>
+
+          {/* Clear Filters */}
+          <div style={{ flex: "0 1 auto" }}>
+            <button
+              onClick={() => {
+                setFilterStatus("all");
+                setFilterDateFrom("");
+                setFilterDateTo("");
+                setSearchQuery("");
+              }}
+              style={{
+                padding: "7px 16px",
+                background: "#6b7280",
+                color: "white",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Row 3 - list of payment links */}
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th align="left">Created At</th>
-            <th align="left">Customer</th>
-            <th align="left">Phone</th>
-            <th align="left">Course</th>
-            <th align="left">Amount</th>
-            <th align="left">Gateway</th>
-            <th align="left">Status</th>
-            <th align="left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {links.map((link) => (
-            <tr key={link.id}>
-              <td>{new Date(link.created_at).toLocaleString()}</td>
-              <td>{link.customer_name}</td>
-              <td>{link.customer_phone}</td>
-              <td>{link.course_name || "-"}</td>
-              <td>{link.link_amount}</td>
-              <td>{link.gateway}</td>
-              <td>{link.status}</td>
-              <td>
-                <button
-                  onClick={() => {
-                    setSelectedLink(link);
-                    setCopyMessage("");
-                  }}
-                >
-                  View details
-                </button>
-              </td>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <thead>
+            <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Created At
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Customer
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Phone
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Course
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Amount
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Gateway
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Status
+              </th>
+              {/* 👇 NEW: Created By column */}
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Created By
+              </th>
+              <th align="left" style={{ padding: "12px 8px" }}>
+                Actions
+              </th>
             </tr>
-          ))}
-          {links.length === 0 && (
-            <tr>
-              <td colSpan={8}>No payment links yet.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {links.map((link) => (
+              <tr key={link.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: "12px 8px" }}>{new Date(link.created_at).toLocaleString()}</td>
+                <td style={{ padding: "12px 8px" }}>{link.customer_name}</td>
+                <td style={{ padding: "12px 8px" }}>{link.customer_phone}</td>
+                <td style={{ padding: "12px 8px" }}>{link.course_name || "-"}</td>
+                <td style={{ padding: "12px 8px" }}>₹{link.link_amount}</td>
+                <td style={{ padding: "12px 8px" }}>{link.gateway}</td>
+                <td style={{ padding: "12px 8px" }}>
+                  <span
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      background:
+                        link.status === "paid"
+                          ? "#d1fae5"
+                          : link.status === "partial_paid"
+                          ? "#fef3c7"
+                          : "#e5e7eb",
+                      color:
+                        link.status === "paid"
+                          ? "#065f46"
+                          : link.status === "partial_paid"
+                          ? "#92400e"
+                          : "#1f2937",
+                    }}
+                  >
+                    {link.status}
+                  </span>
+                </td>
+                {/* 👇 NEW: Show creator name */}
+                <td style={{ padding: "12px 8px" }}>{link.creator_name || "-"}</td>
+                <td style={{ padding: "12px 8px" }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {/* 👇 NEW: Copy Link button */}
+                    {link.gateway_link_url && (
+                      <button
+                        onClick={() => handleCopyLink(link.gateway_link_url!)}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          background: "#3b82f6",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Copy Link
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedLink(link);
+                        setCopyMessage("");
+                      }}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        background: "#6b7280",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                      }}
+                    >
+                      View details
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {links.length === 0 && (
+              <tr>
+                <td colSpan={9} style={{ padding: "24px", textAlign: "center", color: "#6b7280" }}>
+                  No payment links found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
