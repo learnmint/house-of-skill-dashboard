@@ -12,7 +12,8 @@ const supabase = createClient(
 
 interface PaymentLink {
   id: string;
-  course_id: string;
+  course_id: string | null;
+  course_name: string | null;
   customer_name: string;
   customer_phone: string;
   customer_email: string;
@@ -20,6 +21,7 @@ interface PaymentLink {
   link_amount: number;
   status: string;
 }
+
 
 interface Course {
   id: string;
@@ -70,7 +72,15 @@ export default function CheckoutPage() {
       setCustomerPhone(data.customer_phone || '');
       setCustomerEmail(data.customer_email || '');
 
-      // Fetch course name + WhatsApp community link
+      // Fetch course name 
+// Use course_name directly from payment_links
+if (data.course_name) {
+  setCourseName(data.course_name);
+} else {
+  setCourseName('Unknown Course');
+}
+
+// WhatsApp community link from courses
 if (data.course_id) {
   const { data: courseData, error: courseError } = await supabase
     .from('courses')
@@ -79,17 +89,22 @@ if (data.course_id) {
     .single();
 
   if (courseError || !courseData) {
-    console.error('❌ Error fetching course:', courseError);
-    setCourseName('Unknown Course');
-    setWhatsappLink('https://chat.whatsapp.com/YOUR_DEFAULT_COMMUNITY_LINK');
+    console.error('Error fetching course:', courseError);
+    setCourseName(data.course_name || 'Unknown Course');
+    setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
   } else {
-    console.log('✅ Fetched course data:', courseData);
-    setCourseName(courseData.name);
+    setCourseName(courseData.name || data.course_name || 'Unknown Course');
     setWhatsappLink(
-      courseData.whatsapp_community_link || 'https://chat.whatsapp.com/YOUR_DEFAULT_COMMUNITY_LINK'
+      courseData.whatsapp_community_link ||
+        'https://chat.whatsapp.com/YOUR_FALLBACK_LINK'
     );
   }
+} else {
+  setCourseName(data.course_name || 'Unknown Course');
+  setWhatsappLink('https://chat.whatsapp.com/YOUR_FALLBACK_LINK');
 }
+
+
 
     } catch (err: any) {
       console.error('❌ Error fetching payment link:', err);
@@ -142,7 +157,7 @@ if (data.course_id) {
         key: keyId,
         amount: amount,
         currency: currency,
-        name: 'Academy',
+        name: 'Learn Mint',
         description: `Course ID: ${paymentLink.course_id}`,
         order_id: orderId,
         prefill: {
@@ -176,6 +191,8 @@ if (data.course_id) {
       course: courseName,
       whatsapp: whatsappLink
     });
+    const successUrl = `/success?course=${encodeURIComponent(courseName)}&whatsapp=${encodeURIComponent(whatsappLink)}`;
+
     window.location.href = `/success?${params.toString()}`;
   } else {
     alert('Payment verification failed. Please contact support.');
@@ -237,7 +254,7 @@ if (data.course_id) {
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-          }
+          }n
         `}</style>
       </>
     );
@@ -299,24 +316,45 @@ if (data.course_id) {
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
           padding: '40px'
         }}>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            marginBottom: '8px',
-            color: '#2563eb'
-          }}>
-            Academy
-          </h1>
+          <div
+  style={{
+    backgroundColor: '#22c55e', // green background
+    borderRadius: '16px 16px 0 0',
+    padding: '24px 32px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  }}
+>
+  {/* Logo */}
+  <img
+    src="/logo.png"      // put your logo file in /public/logo.png
+    alt="Learn Mint Logo"
+    style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+  />
 
-          <p style={{
-            textAlign: 'center',
-            color: '#6b7280',
-            marginBottom: '40px',
-            fontSize: '14px'
-          }}>
-            Secure Checkout
-          </p>
+  <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <span
+      style={{
+        fontSize: '24px',
+        fontWeight: 700,
+        color: '#ffffff', // Learn Mint in white
+        letterSpacing: '0.03em',
+      }}
+    >
+      Learn Mint
+    </span>
+    <span
+      style={{
+        fontSize: '13px',
+        color: '#e5fbe9',
+        marginTop: '2px',
+      }}
+    >
+      Secure Checkout Page
+    </span>
+  </div>
+</div>
 
           <div style={{ marginBottom: '32px' }}>
             <h2 style={{
