@@ -617,7 +617,7 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
         );
       })()}
 
-      {/* Payment Journey Modal */}
+      {/* Payment Journey Modal - ENHANCED VERSION */}
 {selectedLinkForJourney && (
   <div style={{
     position: 'fixed',
@@ -675,13 +675,112 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
             backgroundColor: '#e5e7eb'
           }} />
 
-          {journeyEvents.map((event) => {
+          {journeyEvents.map((event, index) => {
             const eventData = event.event_data || {};
-            const isSuccess = event.event_type.includes('captured') || event.event_type.includes('paid');
-            const isFailed = event.event_type.includes('failed');
+            
+            // Helper function to get event icon
+            const getEventIcon = (eventType: string) => {
+              switch (eventType) {
+                case 'checkout_opened':
+                  return '🔗';
+                case 'form_name_entered':
+                  return '✏️';
+                case 'form_phone_entered':
+                  return '📱';
+                case 'form_email_entered':
+                  return '📧';
+                case 'form_validation_failed':
+                  return '⚠️';
+                case 'payment_button_clicked':
+                  return '🖱️';
+                case 'razorpay_order_created':
+                  return '📝';
+                case 'razorpay_sdk_loaded':
+                  return '⚙️';
+                case 'payment_gateway_opened':
+                  return '💳';
+                case 'payment_modal_opened':
+                  return '📱';
+                case 'payment_modal_closed':
+                  return '❌';
+                case 'payment.authorized':
+                case 'payment_authorized':
+                  return '⏳';
+                case 'payment.captured':
+                case 'payment_captured':
+                case 'order.paid':
+                  return '✅';
+                case 'payment.failed':
+                case 'payment_failed':
+                case 'payment_failed_event':
+                  return '❌';
+                case 'payment_success_handler':
+                  return '✅';
+                case 'payment_verification_failed':
+                  return '⚠️';
+                case 'payment_error':
+                  return '❌';
+                default:
+                  return '📌';
+              }
+            };
+
+            // Helper function to get event title
+            const getEventTitle = (eventType: string) => {
+              switch (eventType) {
+                case 'checkout_opened':
+                  return 'Checkout Page Opened';
+                case 'form_name_entered':
+                  return 'Name Entered';
+                case 'form_phone_entered':
+                  return 'Phone Number Entered';
+                case 'form_email_entered':
+                  return 'Email Entered';
+                case 'form_validation_failed':
+                  return 'Form Validation Failed';
+                case 'payment_button_clicked':
+                  return 'Payment Button Clicked';
+                case 'razorpay_order_created':
+                  return 'Razorpay Order Created';
+                case 'razorpay_sdk_loaded':
+                  return 'Payment Gateway Loaded';
+                case 'payment_gateway_opened':
+                  return 'Payment Gateway Opened';
+                case 'payment_modal_opened':
+                  return 'Payment Modal Opened';
+                case 'payment_modal_closed':
+                  return 'Payment Modal Closed by User';
+                case 'payment.authorized':
+                case 'payment_authorized':
+                  return 'Payment Authorized';
+                case 'payment.captured':
+                case 'payment_captured':
+                  return 'Payment Captured';
+                case 'order.paid':
+                  return 'Order Paid';
+                case 'payment.failed':
+                case 'payment_failed':
+                case 'payment_failed_event':
+                  return 'Payment Failed';
+                case 'payment_success_handler':
+                  return 'Payment Successful';
+                case 'payment_verification_failed':
+                  return 'Payment Verification Failed';
+                case 'payment_error':
+                  return 'Payment Error';
+                default:
+                  return eventType.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+              }
+            };
+
+            const isSuccess = event.event_type.includes('captured') || 
+                             event.event_type.includes('paid') || 
+                             event.event_type.includes('success');
+            const isFailed = event.event_type.includes('failed') || 
+                            event.event_type.includes('error');
 
             return (
-              <div key={event.id} style={{ marginBottom: '32px', position: 'relative' }}>
+              <div key={event.id || index} style={{ marginBottom: '32px', position: 'relative' }}>
                 {/* Timeline dot */}
                 <div style={{
                   position: 'absolute',
@@ -701,10 +800,13 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
                   borderRadius: '8px',
                   border: '1px solid #e5e7eb'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: '600', color: '#1f2937', textTransform: 'capitalize' }}>
-                      {event.event_type.replace(/_/g, ' ')}
-                    </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '20px' }}>{getEventIcon(event.event_type)}</span>
+                      <span style={{ fontWeight: '600', color: '#1f2937' }}>
+                        {getEventTitle(event.event_type)}
+                      </span>
+                    </div>
                     <span style={{ fontSize: '12px', color: '#6b7280' }}>
                       {new Date(event.created_at).toLocaleString('en-IN', {
                         dateStyle: 'medium',
@@ -714,72 +816,133 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
                   </div>
 
                   {/* Event Details */}
-                  <div style={{ fontSize: '14px', color: '#4b5563', marginTop: '12px' }}>
-                    {eventData.method && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Payment Method:</strong>{' '}
-                        <span style={{ textTransform: 'uppercase' }}>{eventData.method}</span>
-                        {eventData.method === 'card' && eventData.card_network && ` (${eventData.card_network})`}
-                        {eventData.method === 'upi' && eventData.vpa && ` (${eventData.vpa})`}
-                        {eventData.method === 'wallet' && eventData.wallet && ` (${eventData.wallet})`}
-                        {eventData.emi_duration && ` (${eventData.emi_duration} months EMI)`}
-                      </div>
-                    )}
-
-                    {eventData.amount && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Amount:</strong> ₹{eventData.amount.toFixed(2)}
-                      </div>
-                    )}
-
-                    {eventData.status && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Status:</strong>{' '}
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: isSuccess ? '#dcfce7' : isFailed ? '#fee2e2' : '#dbeafe',
-                          color: isSuccess ? '#166534' : isFailed ? '#991b1b' : '#1e40af',
-                          fontSize: '12px',
-                          fontWeight: '500'
-                        }}>
-                          {eventData.status}
-                        </span>
-                      </div>
-                    )}
-
-                    {eventData.bank && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Bank:</strong> {eventData.bank}
-                      </div>
-                    )}
-
-                    {eventData.error_description && (
-                      <div style={{
-                        marginTop: '12px',
-                        padding: '12px',
-                        backgroundColor: '#fef2f2',
-                        borderLeft: '4px solid #ef4444',
-                        borderRadius: '4px'
-                      }}>
-                        <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>
-                          Failure Reason:
+                  {Object.keys(eventData).length > 0 && (
+                    <div style={{ fontSize: '14px', color: '#4b5563', marginTop: '12px' }}>
+                      {/* Payment Method */}
+                      {eventData.method && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Payment Method:</strong>{' '}
+                          <span style={{ textTransform: 'uppercase' }}>{eventData.method}</span>
+                          {eventData.card_network && ` (${eventData.card_network})`}
+                          {eventData.vpa && ` (${eventData.vpa})`}
+                          {eventData.wallet && ` (${eventData.wallet})`}
                         </div>
-                        <div style={{ color: '#dc2626' }}>{eventData.error_description}</div>
-                        {eventData.error_reason && (
-                          <div style={{ color: '#7f1d1d', fontSize: '12px', marginTop: '4px' }}>
-                            ({eventData.error_reason})
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      )}
 
-                    {eventData.razorpay_payment_id && (
-                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px' }}>
-                        Payment ID: {eventData.razorpay_payment_id}
-                      </div>
-                    )}
-                  </div>
+                      {/* Amount */}
+                      {eventData.amount && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Amount:</strong> ₹{(eventData.amount / 100).toFixed(2)}
+                        </div>
+                      )}
+
+                      {/* Status */}
+                      {eventData.status && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Status:</strong>{' '}
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: isSuccess ? '#dcfce7' : isFailed ? '#fee2e2' : '#dbeafe',
+                            color: isSuccess ? '#166534' : isFailed ? '#991b1b' : '#1e40af',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}>
+                            {eventData.status}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Name */}
+                      {eventData.name && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Name:</strong> {eventData.name}
+                        </div>
+                      )}
+
+                      {/* Phone */}
+                      {eventData.phone && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Phone:</strong> {eventData.phone}
+                        </div>
+                      )}
+
+                      {/* Email */}
+                      {eventData.email && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Email:</strong> {eventData.email}
+                        </div>
+                      )}
+
+                      {/* Order ID */}
+                      {eventData.order_id && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Order ID:</strong> {eventData.order_id}
+                        </div>
+                      )}
+
+                      {/* Missing Field (for validation failures) */}
+                      {eventData.missing_field && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Missing Field:</strong>{' '}
+                          <span style={{ color: '#dc2626' }}>{eventData.missing_field}</span>
+                        </div>
+                      )}
+
+                      {/* Reason (for modal closed) */}
+                      {eventData.reason && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong>Reason:</strong> {eventData.reason}
+                        </div>
+                      )}
+
+                      {/* User Agent (for checkout opened) */}
+                      {eventData.user_agent && (
+                        <div style={{ marginBottom: '8px', fontSize: '12px', color: '#9ca3af' }}>
+                          <strong>Device:</strong> {eventData.user_agent.includes('Mobile') ? '📱 Mobile' : '💻 Desktop'}
+                        </div>
+                      )}
+
+                      {/* Error Description */}
+                      {eventData.error_description && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px',
+                          backgroundColor: '#fef2f2',
+                          borderLeft: '4px solid #ef4444',
+                          borderRadius: '4px'
+                        }}>
+                          <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>
+                            Error:
+                          </div>
+                          <div style={{ color: '#dc2626' }}>{eventData.error_description}</div>
+                        </div>
+                      )}
+
+                      {/* Generic Error */}
+                      {eventData.error && !eventData.error_description && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px',
+                          backgroundColor: '#fef2f2',
+                          borderLeft: '4px solid #ef4444',
+                          borderRadius: '4px'
+                        }}>
+                          <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>
+                            Error:
+                          </div>
+                          <div style={{ color: '#dc2626' }}>{eventData.error}</div>
+                        </div>
+                      )}
+
+                      {/* Payment IDs */}
+                      {eventData.razorpay_payment_id && (
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px' }}>
+                          Payment ID: {eventData.razorpay_payment_id}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -789,6 +952,7 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
     </div>
   </div>
 )}
+
 
 
 
