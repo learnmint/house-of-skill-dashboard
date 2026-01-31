@@ -1115,7 +1115,7 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
                           ? "#fef3c7"
                           : "#e5e7eb",
                       color:
-                        link.status === "paid"
+                        link.status === "Paid"
                           ? "#065f46"
                           : link.status === "partial_paid"
                           ? "#92400e"
