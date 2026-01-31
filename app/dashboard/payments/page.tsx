@@ -102,29 +102,28 @@ const fetchPaymentJourney = async (paymentLinkId: string) => {
   };
 
   const loadLinks = async () => {
-  // 👇 UPDATED: Use full_name instead of name
   let query = supabase
     .from("payment_links")
-     .select(`
-    id, 
-    customer_name, 
-    customer_phone, 
-    customer_email, 
-    course_id, 
-    course_name, 
-    link_amount, 
-    gateway, 
-    status, 
-    gateway_link_url,      -- gateway direct URL
-    checkout_link_url,     -- NEW
-    created_at, 
-    pitched_amount, 
-    discount_amount, 
-    state, 
-    balance_amount,
-    created_by,
-    profiles!payment_links_created_by_fkey(full_name)
-  `)
+    .select(`
+      id,
+      customer_name,
+      customer_phone,
+      customer_email,
+      course_id,
+      course_name,
+      link_amount,
+      gateway,
+      status,
+      gateway_link_url,
+      checkout_link_url,
+      created_at,
+      pitched_amount,
+      discount_amount,
+      state,
+      balance_amount,
+      created_by,
+      profiles!payment_links_created_by_fkey(full_name)
+    `)
     .order("created_at", { ascending: false });
 
   // Apply filters
