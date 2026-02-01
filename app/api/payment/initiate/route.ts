@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
-import { supabase } from '@/app/lib/supabaseClient';
+import { supabaseServer } from '@/app/lib/supabaseServer';
 
 
 export async function POST(request: NextRequest) {
@@ -46,7 +46,7 @@ console.log('📦 Payment Link ID:', payment_link_id);
 
 
 // 1) Fetch payment link from Supabase
-const { data: paymentLink, error: linkError } = await supabase
+const { data: paymentLink, error: linkError } = await supabaseServer
   .from('payment_links')
   .select('*')
   .eq('id', payment_link_id)
