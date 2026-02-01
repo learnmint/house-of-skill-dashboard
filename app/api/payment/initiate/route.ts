@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
+import { supabase } from '@/app/lib/supabaseClient';
+
 
 export async function POST(request: NextRequest) {
   console.log('==================== API CALLED ====================');
@@ -40,14 +42,38 @@ export async function POST(request: NextRequest) {
 
     const receiptId = payment_link_id.slice(0, 40);
 
-    const options = {
-      amount: 100,
-      currency: 'INR',
-      receipt: receiptId,
-      notes: {
-        payment_link_id: payment_link_id,
-      },
-    };
+console.log('📦 Payment Link ID:', payment_link_id);
+
+
+// 1) Fetch payment link from Supabase
+const { data: paymentLink, error: linkError } = await supabase
+  .from('payment_links')
+  .select('*')
+  .eq('id', payment_link_id)
+  .single();
+
+if (linkError || !paymentLink) {
+  console.error('❌ Payment link not found:', linkError);
+  return NextResponse.json(
+    { error: 'Payment link not found' },
+    { status: 404 }
+  );
+}
+
+// 2) Use link_amount (rupees) → paise
+const options = {
+  amount: Math.round(paymentLink.link_amount * 100), // e.g. 3999 → 399900
+  currency: 'INR',
+  receipt: receiptId,
+  notes: {
+    payment_link_id,
+    customer_name: paymentLink.customer_name,
+    customer_phone: paymentLink.customer_phone,
+    customer_email: paymentLink.customer_email,
+  },
+};
+
+
 
     console.log('📤 Creating Razorpay order with options:', JSON.stringify(options, null, 2));
     
