@@ -10,19 +10,18 @@ const authHeader =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      amount,
-      customer_name,
-      customer_email,
-      customer_phone,
-      description,
-    } = body;
+
+    const amount = body.amount ?? body.link_amount ?? body.linkAmount;
+    const customer_name =
+      body.customer_name || body.customername || body.customerName;
+    const customer_email =
+      body.customer_email || body.customeremail || body.customerEmail;
+    const customer_phone =
+      body.customer_phone || body.customerphone || body.customerPhone;
+    const description = body.description || body.desc || body.payment_description;
 
     if (!amount || !customer_name || !customer_phone) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     // Razorpay amount is in paise (multiply by 100)
