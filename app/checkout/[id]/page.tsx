@@ -30,8 +30,10 @@ declare global {
 
 export default function CheckoutPage() {
   const params = useParams();
-  const id = params.id as string;
+  // route file should be app/checkout/[code]/page.tsx (or pages/checkout/[code].tsx)
+  const code = params.code as string; // short_code in URL
 
+  const [paymentLinkId, setPaymentLinkId] = useState<string | null>(null);
   const [paymentLink, setPaymentLink] = useState<PaymentLink | null>(null);
   const [courseName, setCourseName] = useState<string>('Loading...');
   const [whatsappLink, setWhatsappLink] = useState<string>('');
@@ -45,7 +47,7 @@ export default function CheckoutPage() {
   const trackJourneyEvent = async (eventType: string, eventData: any = {}) => {
     try {
       await supabase.from('payment_events').insert({
-        payment_link_id: id,
+        payment_link_id: paymentLinkId, // can be null for very first events
         event_type: eventType,
         event_data: eventData,
         created_at: new Date().toISOString(),
@@ -55,28 +57,35 @@ export default function CheckoutPage() {
     }
   };
 
-  useEffect(() => {
-    fetchPaymentLink();
-    trackJourneyEvent('checkout_opened', {
-      user_agent: navigator.userAgent,
-      referrer: document.referrer || 'direct',
-      timestamp: new Date().toISOString(),
-    });
-  }, [id]);
-
   const fetchPaymentLink = async () => {
     try {
       const { data, error } = await supabase
         .from('payment_links')
         .select('*')
-        .eq('id', id)
+        .eq('short_code', code)
         .single();
 
       if (error) throw error;
+      if (!data) throw new Error('Payment link not found');
 
-      // already paid → redirect to success
+      // set main state
+      setPaymentLink(data as PaymentLink);
+      setPaymentLinkId(data.id);
+      setCustomerName(data.customer_name || '');
+      setCustomerPhone(data.customer_phone || '');
+      setCustomerEmail(data.customer_email || '');
+      setCourseName(data.course_name || 'Unknown Course');
+
+      // log checkout opened once we know the real id
+      await trackJourneyEvent('checkout_opened', {
+        user_agent: navigator.userAgent,
+        referrer: document.referrer || 'direct',
+        timestamp: new Date().toISOString(),
+      });
+
+      // if already paid, redirect to success
       if (data.status === 'paid' || data.status === 'fully_paid') {
-        let courseName = data.course_name || 'Unknown Course';
+        let finalCourseName = data.course_name || 'Unknown Course';
         let courseWhatsapp = '';
 
         if (data.course_id) {
@@ -87,13 +96,13 @@ export default function CheckoutPage() {
             .single();
 
           if (courseData) {
-            courseName = courseData.name || courseName;
+            finalCourseName = courseData.name || finalCourseName;
             courseWhatsapp = courseData.whatsapp_community_link || '';
           }
         }
 
         const params = new URLSearchParams({
-          course: courseName,
+          course: finalCourseName,
           whatsapp: courseWhatsapp || '',
           pl: data.id, // payment_link_id
         });
@@ -101,13 +110,6 @@ export default function CheckoutPage() {
         window.location.href = `/success?${params.toString()}`;
         return;
       }
-
-      setPaymentLink(data);
-      setCustomerName(data.customer_name || '');
-      setCustomerPhone(data.customer_phone || '');
-      setCustomerEmail(data.customer_email || '');
-
-      setCourseName(data.course_name || 'Unknown Course');
 
       // always fetch latest WhatsApp community link from courses
       if (data.course_id) {
@@ -122,7 +124,9 @@ export default function CheckoutPage() {
           setCourseName(data.course_name || 'Unknown Course');
           setWhatsappLink('');
         } else {
-          setCourseName(courseData.name || data.course_name || 'Unknown Course');
+          setCourseName(
+            courseData.name || data.course_name || 'Unknown Course'
+          );
           setWhatsappLink(courseData.whatsapp_community_link || '');
         }
       } else {
@@ -136,6 +140,12 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!code) return;
+    fetchPaymentLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const handlePayment = async () => {
     if (!paymentLink) return;
@@ -313,7 +323,7 @@ export default function CheckoutPage() {
                 animation: 'spin 1s linear infinite',
                 margin: '0 auto 16px',
               }}
-            > </div>
+            ></div>
             <p style={{ fontSize: '18px', color: '#6b7280' }}>Loading...</p>
           </div>
         </div>
