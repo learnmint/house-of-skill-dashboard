@@ -30,8 +30,8 @@ declare global {
 
 export default function CheckoutPage() {
   const params = useParams();
-  // route file should be app/checkout/[code]/page.tsx (or pages/checkout/[code].tsx)
-  const code = params.code as string; // short_code in URL
+  // route file is app/checkout/[id]/page.tsx — param name is `id`
+  const code = params.id as string; // this may be a UUID (id) or a short_code
 
   const [paymentLinkId, setPaymentLinkId] = useState<string | null>(null);
   const [paymentLink, setPaymentLink] = useState<PaymentLink | null>(null);
@@ -59,10 +59,18 @@ export default function CheckoutPage() {
 
   const fetchPaymentLink = async () => {
     try {
+      // decide whether the value in the URL is a UUID (id) or a short_code
+      const isUUID = (s: string) =>
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+          s
+        );
+
+      const field = isUUID(code) ? 'id' : 'short_code';
+
       const { data, error } = await supabase
         .from('payment_links')
         .select('*')
-        .eq('short_code', code)
+        .eq(field, code)
         .single();
 
       if (error) throw error;

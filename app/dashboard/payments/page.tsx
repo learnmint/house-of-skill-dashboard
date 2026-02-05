@@ -25,6 +25,7 @@ type PaymentLink = {
   status: string;
   gatewaylinkurl: string | null;
   checkoutlinkurl?: string | null;
+  short_code?: string | null;
   createdat: string;
   discountamount: number | null;
   balanceamount?: number | null;
@@ -223,7 +224,8 @@ if (me.role === "bda") {
   gateway: row.gateway,
   status: row.status,
   gatewaylinkurl: row.gateway_link_url,
-  checkoutlinkurl: row.checkout_link_url,
+      checkoutlinkurl: row.checkout_link_url,
+      short_code: row.short_code,
   discountamount: row.discount_amount,
   balanceamount: row.balance_amount,
   pitchedamount: row.pitched_amount,          // ← this line is the key
@@ -331,13 +333,14 @@ if (me.role === "bda") {
           .eq("id", insertData.id);
           const shortCode = generateShortCode();
 
-// update row with short_code
+// update row with short_code and canonical checkout URL (short-code based)
+const shortCheckoutUrl = `${window.location.origin}/checkout/${shortCode}`;
 const { error: shortErr } = await supabase
   .from("payment_links")
-  .update({ short_code: shortCode })
+  .update({ short_code: shortCode, checkout_link_url: shortCheckoutUrl })
   .eq("id", insertData.id);
 
-checkoutPageUrl = `${window.location.origin}/checkout/${shortCode}`;
+checkoutPageUrl = shortCheckoutUrl;
 
 
         if (updateError) {
@@ -368,6 +371,16 @@ checkoutPageUrl = `${window.location.origin}/checkout/${shortCode}`;
       alert("Link copied to clipboard!");
     } catch (e) {
       alert("Failed to copy link");
+    }
+  };
+
+  const getCheckoutUrl = (link: PaymentLink) => {
+    try {
+      if (link.short_code) return `${window.location.origin}/checkout/${link.short_code}`;
+      if (link.checkoutlinkurl) return link.checkoutlinkurl;
+      return `${window.location.origin}/checkout/${link.id}`;
+    } catch (e) {
+      return link.checkoutlinkurl || `${window.location.origin}/checkout/${link.id}`;
     }
   };
 
@@ -629,22 +642,20 @@ checkoutPageUrl = `${window.location.origin}/checkout/${shortCode}`;
                 </td>
                 <td style={{ padding: "12px 8px" }}>
                   <div style={{ display: "flex", gap: 8 }}>
-                    {link.checkoutlinkurl && (
-                      <button
-                        onClick={() => handleCopyLink(link.checkoutlinkurl!)}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: 12,
-                          background: "#3b82f6",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 4,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Copy Checkout
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleCopyLink(getCheckoutUrl(link))}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        background: "#3b82f6",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Copy Checkout
+                    </button>
                     {link.gatewaylinkurl && (
                       <button
                         onClick={() => handleCopyLink(link.gatewaylinkurl!)}
@@ -1516,34 +1527,32 @@ checkoutPageUrl = `${window.location.origin}/checkout/${shortCode}`;
                 flex: 1,
               }}
             >
-              {selectedLink.checkoutlinkurl || "(not generated yet)"}
+              {getCheckoutUrl(selectedLink)}
             </span>
-            {selectedLink.checkoutlinkurl && (
-  <button
-    type="button"
-    onClick={async () => {
-      try {
-        await navigator.clipboard.writeText(selectedLink.checkoutlinkurl!);
-        setCopyMessage("Link copied");
-        setTimeout(() => setCopyMessage(""), 500);
-      } catch (e) {
-        setCopyMessage("Could not copy link");
-        setTimeout(() => setCopyMessage(""), 500);
-      }
-    }}
-    style={{
-      padding: "6px 10px",
-      borderRadius: 9999,
-      border: "none",
-      background: "linear-gradient(135deg,#3b82f6,#2563eb)",
-      color: "white",
-      fontSize: 12,
-      cursor: "pointer",
-    }}
-  >
-    Copy
-  </button>
-)}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(getCheckoutUrl(selectedLink));
+                  setCopyMessage("Link copied");
+                  setTimeout(() => setCopyMessage(""), 500);
+                } catch (e) {
+                  setCopyMessage("Could not copy link");
+                  setTimeout(() => setCopyMessage(""), 500);
+                }
+              }}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 9999,
+                border: "none",
+                background: "linear-gradient(135deg,#3b82f6,#2563eb)",
+                color: "white",
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Copy
+            </button>
           </div>
 
           <p><strong>Gateway Link:</strong></p>
