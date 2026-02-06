@@ -30,8 +30,8 @@ declare global {
 
 export default function CheckoutPage() {
   const params = useParams();
-  // route file is app/checkout/[id]/page.tsx — param name is `id`
-  const code = params.short_code as string; // this may be a UUID (id) or a short_code
+  const code = params.id as string; // this may be a UUID (id) or a short_code
+
 
   const [paymentLinkId, setPaymentLinkId] = useState<string | null>(null);
   const [paymentLink, setPaymentLink] = useState<PaymentLink | null>(null);
@@ -78,7 +78,8 @@ export default function CheckoutPage() {
 
       // set main state
       setPaymentLink(data as PaymentLink);
-      setPaymentLinkId(data.short_code);
+      setPaymentLinkId(data.id);            // real primary key
+
       setCustomerName(data.customer_name || '');
       setCustomerPhone(data.customer_phone || '');
       setCustomerEmail(data.customer_email || '');
@@ -112,7 +113,7 @@ export default function CheckoutPage() {
         const params = new URLSearchParams({
           course: finalCourseName,
           whatsapp: courseWhatsapp || '',
-          pl: data.short_code, // payment_link_id
+          pl: data.id, // payment_link_id
         });
 
         window.location.href = `/success?${params.toString()}`;
