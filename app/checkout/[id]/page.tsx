@@ -222,7 +222,7 @@ export default function CheckoutPage() {
         key: keyId,
         amount,
         currency,
-        name: 'Learn Mint',
+        name: 'House of Skill',
         description: `Course: ${courseName}`,
         order_id: orderId,
         prefill: {
@@ -438,7 +438,7 @@ export default function CheckoutPage() {
           >
             <img
               src="/logo.png"
-              alt="Learn Mint Logo"
+              alt="House of skill logo"
               style={{ width: '40px', height: '40px', objectFit: 'contain' }}
             />
 
@@ -451,12 +451,12 @@ export default function CheckoutPage() {
                   letterSpacing: '0.03em',
                 }}
               >
-                Learn Mint
+                House of Skill
               </span>
               <span
                 style={{
                   fontSize: '13px',
-                  color: '#e5fbe9',
+                  color: '#9db4dd',
                   marginTop: '2px',
                 }}
               >
