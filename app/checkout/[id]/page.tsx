@@ -428,7 +428,7 @@ export default function CheckoutPage() {
         >
           <div
             style={{
-              backgroundColor: '#22c55e',
+              backgroundColor: '#6286da',
               borderRadius: '16px 16px 0 0',
               padding: '24px 32px',
               display: 'flex',
@@ -456,7 +456,7 @@ export default function CheckoutPage() {
               <span
                 style={{
                   fontSize: '13px',
-                  color: '#9db4dd',
+                  color: '#d8e4e6',
                   marginTop: '2px',
                 }}
               >
