@@ -188,6 +188,11 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ fontSize: '32px', fontWeight: 900, margin: 0, letterSpacing: '-1px' }}>
+          <img
+            src="/logo.png"
+            alt="Learn Mint Logo"
+            style={{ width: "50px", height: "50px", objectFit: "contain" }}
+          />
           House of Skill
         </h1>
         <p style={{ fontSize: '13px', color: 'rgba(226, 232, 240, 0.6)', margin: '4px 0 0 0' }}>
