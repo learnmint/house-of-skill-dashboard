@@ -47,6 +47,10 @@ export default function PaymentsPage() {
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  
+  // pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // form fields
   const [customerName, setCustomerName] = useState("");
@@ -78,6 +82,7 @@ export default function PaymentsPage() {
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1);
     loadLinks();
   }, [filterStatus, filterDateFrom, filterDateTo, searchQuery]);
 
@@ -412,74 +417,67 @@ checkoutPageUrl = shortCheckoutUrl;
   }, [selectedLinkForJourney]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Payments</h1>
-
+    <div style={{ 
+      height: "100vh", 
+      display: "flex", 
+      flexDirection: "column",
+      overflow: "hidden",
+      padding: 20,
+    }}>
+      <h1 style={{ margin: "0 0 5px 0" }}>Payments</h1>
+      
       {/* Row 1 - Generate Link */}
       <div
-        style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}
+        style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}
       >
         <button onClick={() => setShowForm(true)}>Generate Link</button>
       </div>
 
       {/* Row 2 - Filters */}
-      <div
-        style={{
-          marginBottom: 16,
-          padding: 16,
-          background: "#f5f5f5",
-          borderRadius: 8,
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-        }}
-      >
-        <div style={{ flex: "1 1 200px" }}>
+      <div className="filter-section" style={{ 
+        flexShrink: 0,
+      }}>
+        <div style={{ flex: "1 1 100px" }}>
           <label
             style={{
               display: "block",
-              marginBottom: 4,
-              fontSize: 14,
-              fontWeight: 500,
+              marginBottom: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--filter-label-color, #0f172a)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
             }}
           >
             Search
           </label>
           <input
+            className="filter-input"
             type="text"
             placeholder="Name, Phone, Email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
           />
         </div>
 
-        <div style={{ flex: "0 1 150px" }}>
+        <div style={{ flex: "0 1 100px" }}>
           <label
             style={{
               display: "block",
-              marginBottom: 4,
-              fontSize: 14,
-              fontWeight: 500,
+              marginBottom: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--filter-label-color, #0f172a)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
             }}
           >
             Status
           </label>
           <select
+            className="filter-select"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
           >
             <option value="all">All</option>
             <option value="link_created">Link Created</option>
@@ -489,69 +487,58 @@ checkoutPageUrl = shortCheckoutUrl;
           </select>
         </div>
 
-        <div style={{ flex: "0 1 150px" }}>
+        <div style={{ flex: "0 1 100px" }}>
           <label
             style={{
               display: "block",
-              marginBottom: 4,
-              fontSize: 14,
-              fontWeight: 500,
+              marginBottom: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--filter-label-color, #0f172a)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
             }}
           >
             From Date
           </label>
           <input
+            className="filter-input"
             type="date"
             value={filterDateFrom}
             onChange={(e) => setFilterDateFrom(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
           />
         </div>
 
-        <div style={{ flex: "0 1 150px" }}>
+        <div style={{ flex: "0 1 100px" }}>
           <label
             style={{
               display: "block",
-              marginBottom: 4,
-              fontSize: 14,
-              fontWeight: 500,
+              marginBottom: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--filter-label-color, #0f172a)",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
             }}
           >
             To Date
           </label>
           <input
+            className="filter-input"
             type="date"
             value={filterDateTo}
             onChange={(e) => setFilterDateTo(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 12px",
-              borderRadius: 4,
-              border: "1px solid #ddd",
-            }}
           />
         </div>
 
         <div style={{ flex: "0 1 auto" }}>
           <button
+            className="filter-button"
             onClick={() => {
               setFilterStatus("all");
               setFilterDateFrom("");
               setFilterDateTo("");
               setSearchQuery("");
-            }}
-            style={{
-              padding: "7px 16px",
-              background: "#6b7280",
-              color: "white",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
             }}
           >
             Clear
@@ -560,18 +547,25 @@ checkoutPageUrl = shortCheckoutUrl;
       </div>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
-      {/* Row 3 - Table */}
-      <div style={{ overflowX: "auto" }}>
+      
+      {/* Row 3 - Table Container with Internal Scroll */}
+      <div style={{ 
+        overflowY: "auto", 
+        overflowX: "auto",
+        flex: 1,
+        marginBottom: 5,
+        borderRadius: 5,
+        marginTop: 5,
+      }}>
         <table
           style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
         >
-          <thead>
-            <tr
-              style={{
-                background: "#f9fafb",
-                borderBottom: "2px solid #e5e7eb",
-              }}
-            >
+          <thead style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 40,
+          }}>
+            <tr>
               <th align="left" style={{ padding: "12px 8px" }}>
                 Created At
               </th>
@@ -602,8 +596,13 @@ checkoutPageUrl = shortCheckoutUrl;
             </tr>
           </thead>
           <tbody>
-            {links.map((link) => (
-              <tr key={link.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+            {(() => {
+              const startIdx = (currentPage - 1) * itemsPerPage;
+              const endIdx = startIdx + itemsPerPage;
+              const paginatedLinks = links.slice(startIdx, endIdx);
+              
+              return paginatedLinks.length > 0 ? paginatedLinks.map((link) => (
+              <tr key={link.id}>
                 <td style={{ padding: "12px 8px" }}>
                   {new Date(link.createdat).toLocaleString()}
                 </td>
@@ -703,24 +702,76 @@ checkoutPageUrl = shortCheckoutUrl;
                   </div>
                 </td>
               </tr>
-            ))}
-            {links.length === 0 && (
+              )) : (
               <tr>
                 <td
                   colSpan={9}
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: "#6b7280",
+                    color: "var(--filter-text)",
                   }}
                 >
                   No payment links found.
                 </td>
               </tr>
-            )}
+              );
+            })()}
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls - Fixed at Bottom */}
+      {links.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 16,
+            padding: 16,
+            borderTop: "1px solid rgba(99, 102, 241, 0.2)",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="filter-button"
+            style={{
+              opacity: currentPage === 1 ? 0.5 : 1,
+              cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            ← Previous
+          </button>
+
+          <div
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              background: "rgba(99, 102, 241, 0.15)",
+              color: "var(--filter-text)",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Page {currentPage} of {Math.ceil(links.length / itemsPerPage)}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(links.length / itemsPerPage), prev + 1))}
+            disabled={currentPage >= Math.ceil(links.length / itemsPerPage)}
+            className="filter-button"
+            style={{
+              opacity: currentPage >= Math.ceil(links.length / itemsPerPage) ? 0.5 : 1,
+              cursor: currentPage >= Math.ceil(links.length / itemsPerPage) ? "not-allowed" : "pointer",
+            }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* Create Link popup */}
       {showForm && (
@@ -1463,12 +1514,12 @@ checkoutPageUrl = shortCheckoutUrl;
           </div>
           <div style={rowStyle}>
             <span style={labelStyle}>
-              Course Fees (Max Price)
+              Course Fees
             </span>
             <span style={valueStyle}>₹{maxPrice}</span>
           </div>
           <div style={rowStyle}>
-            <span style={labelStyle}>Discount Amount</span>
+            <span style={labelStyle}>Discount</span>
             <span style={valueStyle}>
               ₹{discountAmount}
             </span>
