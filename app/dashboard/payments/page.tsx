@@ -428,9 +428,9 @@ checkoutPageUrl = shortCheckoutUrl;
       
       {/* Row 1 - Generate Link */}
       <div
-        style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}
+        style={{flex: "0 1 auto", display: "flex", justifyContent: "flex-end", marginBottom: 8 }}
       >
-        <button onClick={() => setShowForm(true)}>Generate Link</button>
+        <button className="filter-button" onClick={() => setShowForm(true)}>Generate Link</button>
       </div>
 
       {/* Row 2 - Filters */}
@@ -561,7 +561,7 @@ checkoutPageUrl = shortCheckoutUrl;
           style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
         >
           <thead style={{
-            position: 'sticky',
+            
             top: 0,
             zIndex: 40,
           }}>
@@ -779,7 +779,9 @@ checkoutPageUrl = shortCheckoutUrl;
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.4)",
+            background:
+            "linear-gradient(135deg, rgba(7, 21, 69, 0.4), rgba(8, 47, 73, 0.76))",
+            backdropFilter: "blur(4px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -788,10 +790,11 @@ checkoutPageUrl = shortCheckoutUrl;
         >
           <div
             style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 8,
-              width: 400,
+              background:
+              "linear-gradient(185deg, rgb(189, 203, 220), rgb(230, 227, 236))",
+              padding: 34,
+              borderRadius: 22,
+              width: 800,
             }}
           >
             <h2>Create Payment Link</h2>
@@ -827,7 +830,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   required
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -838,7 +841,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   required
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -848,7 +851,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -858,7 +861,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   type="number"
                   value={pitchedAmount}
                   onChange={(e) => setPitchedAmount(e.target.value)}
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -869,7 +872,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   value={linkAmount}
                   onChange={(e) => setLinkAmount(e.target.value)}
                   required
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -879,7 +882,7 @@ checkoutPageUrl = shortCheckoutUrl;
                   type="text"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  style={{ width: "100%", marginTop: 4, marginBottom: 8 }}
+                  style={{ width: "96%", marginTop: 4, marginBottom: 8 }}
                 />
               </label>
 
@@ -902,18 +905,18 @@ checkoutPageUrl = shortCheckoutUrl;
                 style={{
                   display: "flex",
                   justifyContent: "flex-end",
-                  gap: 8,
-                  marginTop: 12,
+                  gap: 6,
+                  marginTop: 2,
                 }}
               >
-                <button
+                <button className="filter-button"
                   type="button"
                   onClick={() => setShowForm(false)}
                   disabled={loading}
                 >
                   Cancel
                 </button>
-                <button type="submit" disabled={loading}>
+                <button className="filter-button" type="submit" disabled={loading}>
                   {loading ? "Creating..." : "Create Link"}
                 </button>
               </div>
